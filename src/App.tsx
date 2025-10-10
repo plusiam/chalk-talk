@@ -14,7 +14,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/chalk-talk">
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/canvas" element={<Canvas />} />
