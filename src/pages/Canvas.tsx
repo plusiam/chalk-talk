@@ -17,6 +17,8 @@ const Canvas = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
   const [color, setColor] = useState("#ffffff");
+  const [penSize, setPenSize] = useState<"small" | "medium" | "large">("medium");
+  const [eraserSize, setEraserSize] = useState<"small" | "medium" | "large">("medium");
   const [history, setHistory] = useState<ImageData[]>([]);
   const [userName, setUserName] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -89,7 +91,10 @@ const Canvas = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    ctx.lineWidth = tool === "eraser" ? 20 : 3;
+    // Get size based on tool and selected size
+    const penSizes = { small: 2, medium: 5, large: 10 };
+    const eraserSizes = { small: 10, medium: 20, large: 40 };
+    ctx.lineWidth = tool === "eraser" ? eraserSizes[eraserSize] : penSizes[penSize];
     ctx.lineCap = "round";
     ctx.strokeStyle = tool === "eraser" ? "hsl(215, 25%, 20%)" : color;
 
@@ -222,6 +227,39 @@ const Canvas = () => {
           >
             <Eraser className="h-5 w-5" />
           </Button>
+
+          <div className="w-px h-8 bg-border" />
+
+          {/* Size selector */}
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-muted-foreground mr-1">
+              {tool === "pen" ? "펜" : "지우개"}
+            </span>
+            <Button
+              variant={tool === "pen" && penSize === "small" || tool === "eraser" && eraserSize === "small" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => tool === "pen" ? setPenSize("small") : setEraserSize("small")}
+              className="h-8 px-2 text-xs"
+            >
+              작게
+            </Button>
+            <Button
+              variant={tool === "pen" && penSize === "medium" || tool === "eraser" && eraserSize === "medium" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => tool === "pen" ? setPenSize("medium") : setEraserSize("medium")}
+              className="h-8 px-2 text-xs"
+            >
+              중간
+            </Button>
+            <Button
+              variant={tool === "pen" && penSize === "large" || tool === "eraser" && eraserSize === "large" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => tool === "pen" ? setPenSize("large") : setEraserSize("large")}
+              className="h-8 px-2 text-xs"
+            >
+              크게
+            </Button>
+          </div>
 
           <div className="w-px h-8 bg-border" />
 
