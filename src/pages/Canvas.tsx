@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Eraser, Pen, Undo, Download, Home, FileDown, Settings, Save, FolderOpen, ChevronLeft, ChevronRight, Plus, Palette } from "lucide-react";
+import { Eraser, Pen, Undo, Download, Home, FileDown, Settings, Save, FolderOpen, ChevronLeft, ChevronRight, Plus, Palette, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { useToast } from "@/hooks/use-toast";
@@ -245,6 +245,25 @@ const Canvas = () => {
     setHistory((prev) => prev.slice(0, -1));
   };
 
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    // Save current state to history before clearing
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setHistory((prev) => [...prev, imageData]);
+
+    // Clear canvas
+    ctx.fillStyle = "hsl(215, 25%, 20%)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    toast({
+      title: "캔버스 지우기",
+      description: "현재 페이지가 모두 지워졌습니다.",
+    });
+  };
+
   const saveDrawing = () => {
     if (!saveName.trim()) {
       toast({
@@ -443,6 +462,16 @@ const Canvas = () => {
             className="hover:bg-accent flex-shrink-0"
           >
             <Eraser className="h-5 w-5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={clearCanvas}
+            className="hover:bg-accent hover:bg-destructive/10 flex-shrink-0"
+            title="전체 지우기"
+          >
+            <Trash2 className="h-5 w-5" />
           </Button>
 
           <div className="w-px h-8 bg-border flex-shrink-0" />
