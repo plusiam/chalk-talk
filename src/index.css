@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 220 20% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 20%;
+    --primary: 215 25% 27%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 215 25% 27%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 15% 45%;
+    --accent: 145 50% 85%;
+    --accent-foreground: 145 60% 25%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 215 25% 27%;
+    --radius: 0.75rem;
+    
+    --chalk-white: 0 0% 95%;
+    --chalk-yellow: 48 95% 76%;
+    --chalk-pink: 340 75% 80%;
+    --chalk-blue: 200 80% 75%;
+    --chalk-green: 145 50% 70%;
+    --chalk-orange: 25 90% 70%;
+    
+    --canvas-bg: 215 25% 20%;
+    --canvas-grid: 215 25% 25%;
+    
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 215 25% 16%;
+    --foreground: 210 40% 98%;
+    --card: 215 25% 20%;
+    --card-foreground: 210 40% 98%;
+    --popover: 215 25% 20%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 215 25% 27%;
+    --secondary: 215 20% 25%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 215 20% 25%;
+    --muted-foreground: 215 15% 60%;
+    --accent: 145 50% 35%;
+    --accent-foreground: 145 50% 95%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 215 20% 30%;
+    --input: 215 20% 30%;
+    --ring: 210 40% 80%;
+    
+    --chalk-white: 0 0% 90%;
+    --chalk-yellow: 48 90% 70%;
+    --chalk-pink: 340 70% 75%;
+    --chalk-blue: 200 75% 70%;
+    --chalk-green: 145 45% 65%;
+    --chalk-orange: 25 85% 65%;
+    
+    --canvas-bg: 215 25% 14%;
+    --canvas-grid: 215 25% 18%;
+    
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
