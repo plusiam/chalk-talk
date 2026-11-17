@@ -296,7 +296,8 @@ function studentBoard(join, token) {
   const cnt = el('div', { class: 'cnt', text: '0 / 80자' }); ta.addEventListener('input', () => cnt.textContent = ta.value.length + ' / 80자');
   const addBtn = el('button', { class: 'main', disabled: true, onclick: addCard }, '＋ 내 생각 카드 붙이기');
   const who = el('span', { class: 'pill' }), title = el('b');
-  put(app, el('div', { class: 'top' }, title, who, el('span', { class: 'sp' }), net), lockB,
+  const saveImg = async () => { if (!st) return; try { const b = await toBlob(await boardCanvas(st)); await showImage(b, `침묵의대화_${st.group_no}모둠_${today()}.png`, st.group_no + '모둠 판 그림'); } catch (e) { say('그림을 만들지 못했어요. 다시 해 봐요.'); } if (st) paint(); };
+  put(app, el('div', { class: 'top' }, title, who, el('span', { class: 'sp' }), el('button', { onclick: saveImg }, '판을 그림으로 저장'), net), lockB,
     el('div', { class: 'wrap' }, board, el('div', { class: 'dock' }, el('div', { style: 'flex:1' }, ta, cnt), addBtn),
       el('div', { class: 'hint', text: '말하지 않고 글로 이야기해요. 친구 카드에는 「덧붙이기」로 질문이나 생각을 달고, 「잇기」로 이어지는 카드끼리 선을 그어요.' })));
   const setNet = () => { net.className = 'net' + (online ? '' : ' off'); net.textContent = !online ? '연결 끊김 · 다시 연결 중' : pending ? '저장하는 중…' : '저장됨'; };
@@ -331,6 +332,154 @@ function studentBoard(join, token) {
 }
 
 /* ───────── 교사 ───────── */
+/* ───────── 내보내기: 판 이미지 · 엑셀 표 (모두 이 기기 안에서 만든다) ───────── */
+const SEATC = { 1: '#2f7de1', 2: '#d1553f', 3: '#2f9a5b', 4: '#8a56c9', 5: '#c98a16', 6: '#3b8f9a' };
+const today = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()); };
+const safeName = s => { const c = String(s).replace(/[\\/:*?"<>|.,\s]+/g, ' ').trim(), t = c.slice(0, 14); return (c.length > 14 && t.includes(' ') ? t.slice(0, t.lastIndexOf(' ')) : t).trim() || '모둠판'; };
+const toBlob = cv => new Promise(r => cv.toBlob(r, 'image/png'));
+function saveBlob(blob, name) { const u = URL.createObjectURL(blob), a = el('a', { href: u, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
+function wrapText(ctx, text, maxW) {
+  const out = [];
+  for (const para of String(text).split(/\n/)) {
+    let line = '';
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      const t = line ? line + ' ' + word : word;
+      if (ctx.measureText(t).width <= maxW) { line = t; continue; }
+      if (line) out.push(line);
+      let w = word;
+      while (ctx.measureText(w).width > maxW && w.length > 1) { let n = w.length - 1; while (n > 1 && ctx.measureText(w.slice(0, n)).width > maxW) n--; out.push(w.slice(0, n)); w = w.slice(n); }
+      line = w;
+    }
+    if (line) out.push(line);
+  }
+  return out.length ? out : [''];
+}
+async function boardCanvas(g) { // 숨긴 카드·지운 카드는 그리지 않는다
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  const FF = getComputedStyle(document.body).fontFamily, font = (px, b) => `${b ? '700 ' : ''}${px}px ${FF}`;
+  const W = 1600, PX = 150, HEAD = 76, FOOT = 60, BH = 960, CW = 250, PAD = 13;
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+  const cards = g.cards.filter(c => !c.hidden && !c.deleted);
+  const boxes = cards.map(c => {
+    ctx.font = font(21); const tx = wrapText(ctx, c.body, CW - PAD * 2);
+    ctx.font = font(17); const cms = g.comments.filter(k => k.card === c.id && !k.hidden).map(k => ({ seat: k.seat, lines: wrapText(ctx, k.body, CW - PAD * 2 - 30) }));
+    return { c, tx, cms, h: PAD + 26 + tx.length * 28 + cms.reduce((n, k) => n + 14 + k.lines.length * 23, 0) + PAD, cx: PX + c.x / 100 * (W - PX * 2), cy: c.y / 100 * BH };
+  });
+  const top = Math.min(0, ...boxes.map(b => b.cy - b.h / 2 - 18)), bottom = Math.max(BH, ...boxes.map(b => b.cy + b.h / 2 + 18)), off = HEAD - top;
+  cv.width = W; cv.height = Math.round(off + bottom + FOOT);
+  const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+  const dot = (x, y, r, seat) => { ctx.fillStyle = SEATC[seat] || '#555'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = font(Math.round(r * 1.25), true); ctx.textAlign = 'center'; ctx.fillText(String(seat), x, y + 1); ctx.textAlign = 'left'; };
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fbfaf6'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#1f5c4d'; ctx.fillRect(0, 0, W, HEAD);
+  ctx.fillStyle = '#fff'; ctx.font = font(30, true); ctx.fillText('침묵의 대화 · ' + g.group_no + '모둠', 36, HEAD / 2 + 1);
+  const d = new Date(); ctx.font = font(20); ctx.textAlign = 'right'; ctx.fillText(`${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`, W - 36, HEAD / 2 + 1); ctx.textAlign = 'left';
+  const at = new Map(boxes.map(b => [b.c.id, b]));
+  ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const l of g.links) { const a = at.get(l.a), b = at.get(l.b); if (!a || !b) continue; ctx.strokeStyle = SEATC[l.seat] || '#555'; ctx.beginPath(); ctx.moveTo(a.cx, off + a.cy); ctx.lineTo(b.cx, off + b.cy); ctx.stroke(); }
+  ctx.font = font(24, true); const ql = wrapText(ctx, g.question, 340), qh = 18 + 24 + ql.length * 32 + 18, qy = off + BH / 2 - qh / 2;
+  ctx.fillStyle = '#1f5c4d'; rr(W / 2 - 195, qy, 390, qh, 18); ctx.fill();
+  ctx.fillStyle = '#ffffffd9'; ctx.textAlign = 'center'; ctx.font = font(16); ctx.fillText('함께 생각할 질문', W / 2, qy + 18 + 10);
+  ctx.fillStyle = '#fff'; ctx.font = font(24, true); ql.forEach((s, i) => ctx.fillText(s, W / 2, qy + 18 + 24 + 16 + i * 32)); ctx.textAlign = 'left';
+  for (const b of boxes) {
+    const x = b.cx - CW / 2, y0 = off + b.cy - b.h / 2; let y = y0 + PAD;
+    ctx.fillStyle = '#fff'; rr(x, y0, CW, b.h, 16); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = SEATC[b.c.seat] || '#555'; ctx.setLineDash([]); rr(x, y0, CW, b.h, 16); ctx.stroke();
+    dot(x + PAD + 11, y + 11, 11, b.c.seat); ctx.fillStyle = '#5d6b63'; ctx.font = font(16); ctx.fillText(SHAPE[b.c.seat] + ' ' + b.c.seat + '번', x + PAD + 30, y + 12); y += 26;
+    ctx.fillStyle = '#1d2b25'; ctx.font = font(21); b.tx.forEach(s => { ctx.fillText(s, x + PAD, y + 15); y += 28; });
+    for (const k of b.cms) {
+      y += 7; ctx.strokeStyle = '#cfd6cf'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(x + PAD, y); ctx.lineTo(x + CW - PAD, y); ctx.stroke(); ctx.setLineDash([]); y += 7;
+      dot(x + PAD + 10, y + 12, 10, k.seat); ctx.fillStyle = '#1d2b25'; ctx.font = font(17); k.lines.forEach(s => { ctx.fillText(s, x + PAD + 30, y + 12); y += 23; });
+    }
+  }
+  const seats = [...new Set([...(g.seats || []), ...cards.map(c => c.seat), ...boxes.flatMap(b => b.cms.map(k => k.seat))])].sort((a, b) => a - b);
+  let lx = 36; const ly = cv.height - FOOT / 2;
+  for (const s of seats) { dot(lx + 11, ly, 11, s); ctx.fillStyle = '#5d6b63'; ctx.font = font(17); const t = SHAPE[s] + ' ' + s + '번'; ctx.fillText(t, lx + 28, ly + 1); lx += 28 + ctx.measureText(t).width + 26; }
+  return cv;
+}
+function showImage(blob, name, title) { // 미리 보고 저장. 닫으면 끝난다
+  return new Promise(done => {
+    const u = URL.createObjectURL(blob); let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { }
+    const canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+    const close = () => { d.close(); d.remove(); URL.revokeObjectURL(u); done(); };
+    const d = el('dialog', { style: 'width:min(900px,94vw);max-width:94vw' }, el('h2', { text: title }),
+      el('img', { src: u, alt: title, style: 'display:block;width:100%;max-height:60vh;object-fit:contain;border:1px solid #d9dfd8;border-radius:10px;background:#fbfaf6' }),
+      el('p', { class: 'muted', text: (canShare ? '「사진에 저장·공유」를 누르거나 그림을 길게 눌러 저장해요.' : '「내려받기」를 누르면 그림 파일로 저장돼요.') + ' 저장한 그림은 패들렛에 올릴 수 있어요.' }),
+      el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' },
+        canShare ? el('button', { class: 'main', onclick: () => navigator.share({ files: [file] }).catch(() => { }) }, '사진에 저장·공유') : null,
+        el('button', { class: canShare ? null : 'main', onclick: () => saveBlob(blob, name) }, '내려받기'), el('button', { onclick: close }, '닫기')));
+    d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+    document.body.append(d); d.showModal();
+  });
+}
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipBlob(files, type) { // files: [{name, data: Uint8Array}] · 압축하지 않고 한 파일로 묶는다
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const dt = new Date(), time = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1), date = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate();
+  for (const f of files) {
+    const nm = enc.encode(f.name), crc = crc32(f.data), h = new DataView(new ArrayBuffer(30)), c = new DataView(new ArrayBuffer(46));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
+    h.setUint32(14, crc, true); h.setUint32(18, f.data.length, true); h.setUint32(22, f.data.length, true); h.setUint16(26, nm.length, true);
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(12, time, true); c.setUint16(14, date, true);
+    c.setUint32(16, crc, true); c.setUint32(20, f.data.length, true); c.setUint32(24, f.data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    parts.push(h.buffer, nm, f.data); cen.push(c.buffer, nm); off += 30 + nm.length + f.data.length;
+  }
+  const cs = cen.reduce((n, b) => n + b.byteLength, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...cen, e.buffer], { type: type || 'application/zip' });
+}
+function xlsxBlob(sheets) { // sheets: [{name, widths, rows, head(머리글 줄 수), plain(테두리 없음), landscape}]
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main', RS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships', PK = 'http://schemas.openxmlformats.org/package/2006/relationships', CT = 'application/vnd.openxmlformats-officedocument.spreadsheetml.';
+  const esc = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const col = n => { let s = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
+  const side = k => `<${k} style="thin"><color rgb="FFB8C2BC"/></${k}>`;
+  const sheetXml = (sh, i) => X + `<worksheet xmlns="${NS}">` + (sh.landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '')
+    + '<sheetViews><sheetView' + (i ? '' : ' tabSelected="1"') + ' workbookViewId="0">' + (sh.head ? `<pane ySplit="${sh.head}" topLeftCell="A${sh.head + 1}" activePane="bottomLeft" state="frozen"/>` : '') + '</sheetView></sheetViews>'
+    + '<cols>' + sh.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols><sheetData>'
+    + sh.rows.map((r, i) => `<row r="${i + 1}">` + r.map((v, j) => {
+      const ref = col(j) + (i + 1), s = sh.plain ? 2 : i < (sh.head || 0) ? 1 : 0;
+      if (v === '' || v == null) return `<c r="${ref}" s="${s}"/>`;
+      return typeof v === 'number' ? `<c r="${ref}" s="${s}"><v>${v}</v></c>` : `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+    }).join('') + '</row>').join('') + '</sheetData>'
+    + (sh.landscape ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '') + '</worksheet>';
+  const styles = X + `<styleSheet xmlns="${NS}"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font></fonts>`
+    + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE4EFEA"/><bgColor indexed="64"/></patternFill></fill></fills>'
+    + `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border></borders>`
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3">'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+    + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+    + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  const files = [
+    ['[Content_Types].xml', X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + `<Override PartName="/xl/workbook.xml" ContentType="${CT}sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="${CT}styles+xml"/>` + sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${CT}worksheet+xml"/>`).join('') + '</Types>'],
+    ['_rels/.rels', X + `<Relationships xmlns="${PK}"><Relationship Id="rId1" Type="${RS}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', X + `<workbook xmlns="${NS}" xmlns:r="${RS}"><bookViews><workbookView activeTab="0"/></bookViews><sheets>` + sheets.map((s, i) => `<sheet name="${esc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels', X + `<Relationships xmlns="${PK}">` + sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="${RS}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') + `<Relationship Id="rId${sheets.length + 1}" Type="${RS}/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml', styles], ...sheets.map((s, i) => ['xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(s, i)])
+  ];
+  const enc = new TextEncoder();
+  return zipBlob(files.map(f => ({ name: f[0], data: enc.encode(f[1]) })), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+function recordSheets(room) { // 숨긴 카드·지운 카드·숨긴 덧붙임은 넣지 않는다. 이름 없이 모둠과 자리 번호만
+  const rows = [['모둠', '자리 번호', '구분', '글', '카드 번호', '덧붙인 카드 · 이은 카드']];
+  for (const g of room.groups) {
+    const cards = g.cards.filter(c => !c.hidden && !c.deleted), no = new Map(cards.map((c, i) => [c.id, i + 1]));
+    const short = c => `카드 ${no.get(c.id)} (${c.seat}번) ${c.body.length > 24 ? c.body.slice(0, 24) + '…' : c.body}`;
+    for (const c of cards) {
+      rows.push([g.group_no, c.seat, '카드', c.body, no.get(c.id), '']);
+      for (const k of g.comments) if (k.card === c.id && !k.hidden) rows.push([g.group_no, k.seat, '덧붙임', k.body, no.get(c.id), short(c)]);
+    }
+    for (const l of g.links) { const a = cards.find(c => c.id === l.a), b = cards.find(c => c.id === l.b); if (a && b) rows.push([g.group_no, l.seat, '잇기', '', '', short(a) + '  ↔  ' + short(b)]); }
+  }
+  const d = new Date();
+  const info = [['침묵의 대화 · 모둠판 자료', ''], ['질문', room.question], ['저장한 날', `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`], ['모둠 수', room.groups.length + '개'], ['', ''],
+  ['자리 번호', '학생 이름이 아닙니다. 수업 때의 자리표와 맞추어 보세요. 「번호 풀기」를 한 자리에는 두 학생의 글이 섞여 있을 수 있습니다.'],
+  ['들어 있지 않은 것', '숨긴 카드, 학생이 지운 카드, 숨긴 덧붙임'],
+  ['카드 번호', '모둠 안에서 카드가 붙은 순서입니다. 덧붙임은 자기가 달린 카드의 번호를 따릅니다.']];
+  return [{ name: '글 내용', widths: [7, 10, 9, 58, 10, 50], rows, head: 1 }, { name: '안내', widths: [28, 96], rows: info, plain: true }];
+}
+
 const CODE_MSG = {
   chalk_bad_code: '코드를 다시 확인해 주세요. 기간이 지났거나 꺼 둔 코드일 수 있습니다.',
   chalk_code_used_up: '이 코드는 정해진 인원이 모두 사용했습니다. 코드를 안내한 분께 알려 주세요.',
@@ -445,13 +594,32 @@ function teacherRoom(roomId) {
       el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'main', onclick: () => { d.close(); d.remove(); } }, '닫기')));
     document.body.append(d); d.showModal(); if (window.QRCode) new QRCode(box, { text: linkOf(g), width: 200, height: 200 });
   }
+  function exportDialog() {
+    const stamp = safeName(st.question) + '_' + today(), msg = el('p', { class: 'muted', 'aria-live': 'polite' });
+    const run = (fn) => async e => { const b = e.currentTarget; b.disabled = true; msg.textContent = '만드는 중…'; try { await refresh(); msg.textContent = await fn(); } catch (err) { msg.textContent = '파일을 만들지 못했습니다. 다시 눌러 주세요.'; } b.disabled = false; };
+    const images = async () => {
+      const gs = st.groups.filter(g => g.cards.some(c => !c.hidden && !c.deleted)); if (!gs.length) return '아직 카드가 붙은 모둠이 없습니다.';
+      const files = []; for (const g of gs) files.push({ name: g.group_no + '모둠.png', data: new Uint8Array(await (await toBlob(await boardCanvas(g))).arrayBuffer()) });
+      saveBlob(zipBlob(files), `침묵의대화_${stamp}_판이미지.zip`); return `카드가 있는 ${gs.length}개 모둠 판을 그림으로 만들어 한 파일(ZIP)로 저장했습니다.`;
+    };
+    const table = async () => { if (!st.groups.some(g => g.cards.some(c => !c.hidden && !c.deleted))) return '아직 카드가 붙은 모둠이 없습니다.'; saveBlob(xlsxBlob(recordSheets(st)), `침묵의대화_${stamp}.xlsx`); return '글 내용 표를 엑셀 파일로 저장했습니다.'; };
+    const d = el('dialog', { style: 'width:min(560px,94vw)' }, el('h2', { text: '자료 저장' }),
+      el('p', { text: '판을 지우거나 7일이 지나면 학생 글이 사라집니다. 남길 자료는 그 전에 저장해 주세요.' }),
+      el('div', { class: 'row' }, el('button', { class: 'main', onclick: run(images) }, '모든 모둠 판 이미지로 저장'), el('button', { class: 'main', onclick: run(table) }, '글 내용 표로 저장 (엑셀)')), msg,
+      el('p', { class: 'muted', text: '이름 대신 모둠과 자리 번호로 저장됩니다. 숨긴 카드와 학생이 지운 카드는 들어가지 않습니다. 파일은 이 기기에서 만들어 내려받습니다.' }),
+      el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { onclick: () => { d.close(); d.remove(); paint(); } }, '닫기')));
+    d.addEventListener('cancel', e => { e.preventDefault(); d.close(); d.remove(); paint(); });
+    document.body.append(d); d.showModal();
+  }
+  const saveOne = async g => { try { const b = await toBlob(await boardCanvas(g)); await showImage(b, `침묵의대화_${g.group_no}모둠_${today()}.png`, g.group_no + '모둠 판 그림'); } catch (e) { say('그림을 만들지 못했습니다. 다시 눌러 주세요.'); } paint(); };
   function paint() {
     const allLocked = st.groups.every(g => g.locked), pres = st.groups.find(g => g.group_id === st.present_group);
     put(head, el('b', { text: '침묵의 대화 · 선생님 화면' }), el('span', { class: 'pill', text: st.question }), el('span', { class: 'sp' }),
       open ? el('button', { onclick: () => { open = null; paint(); } }, '‹ 모든 모둠') : null,
       el('button', { onclick: () => act('lock_all', { p_on: !allLocked }) }, allLocked ? '모든 모둠 다시 쓰기' : '모든 모둠 잠시 멈춤'),
       pres ? el('button', { class: 'main', onclick: () => act('present', { p_target: null }) }, '보여 주기 끝') : null,
-      el('button', { class: 'warn', onclick: async () => { if (confirm('이 모둠판과 학생 글을 모두 지울까요? 되돌릴 수 없습니다.')) { await api.rpc('chalk_teacher_action', { p_room: roomId, p_action: 'delete_room' }); location.href = selfUrl({ t: '1' }); } } }, '판 지우기'));
+      el('button', { onclick: exportDialog }, '자료 저장'),
+      el('button', { class: 'warn', onclick: async () => { if (confirm('이 모둠판과 학생 글을 모두 지울까요? 저장하지 않은 자료는 되돌릴 수 없습니다.')) { await api.rpc('chalk_teacher_action', { p_room: roomId, p_action: 'delete_room' }); location.href = selfUrl({ t: '1' }); } } }, '판 지우기'));
     if (pres && !open) open = pres.group_id;
     const g = open && st.groups.find(x => x.group_id === open);
     if (g) {
@@ -459,7 +627,7 @@ function teacherRoom(roomId) {
       body.className = 'wrap big';
       put(body, el('div', { class: 'row noprint', style: 'margin-bottom:10px' }, el('h2', { style: 'margin:0', text: g.group_no + '모둠' }),
         g.seats.map(s => el('button', { title: '기기를 바꾸거나 번호를 잘못 골랐을 때', onclick: () => { if (confirm(s + '번 자리를 풀까요? 그 학생은 번호를 다시 골라야 하고, 전에 쓴 카드는 남지만 고칠 수 없게 됩니다.')) act('release_seat', { p_target: g.group_id, p_seat: s }); } }, s + '번 풀기')),
-        el('span', { style: 'flex:1' }), el('button', { onclick: () => act('lock_group', { p_target: g.group_id, p_on: !g.locked }) }, g.locked ? '다시 쓰기' : '잠시 멈춤'),
+        el('span', { style: 'flex:1' }), el('button', { onclick: () => saveOne(g) }, '이 판 그림 저장'), el('button', { onclick: () => act('lock_group', { p_target: g.group_id, p_on: !g.locked }) }, g.locked ? '다시 쓰기' : '잠시 멈춤'),
         st.present_group === g.group_id ? el('span', { class: 'net', text: '모두에게 보여 주는 중 · 학생 입력 멈춤' }) : el('button', { class: 'main', onclick: () => act('present', { p_target: g.group_id }) }, '이 판을 모두에게 보여 주기')), board);
       drawBoard(board, g, { role: st.present_group === g.group_id ? 'show' : 'teacher', onCard: (a, c) => act(a === 'restore' ? 'restore_card' : 'hide_card', { p_target: c.id, p_on: !c.hidden }), onComment: (a, k) => act('hide_comment', { p_target: k.id, p_on: !k.hidden }) });
       return;
