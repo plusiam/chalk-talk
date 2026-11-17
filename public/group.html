@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>침묵의 대화 · 모둠판</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:Pretendard,'맑은 고딕','Malgun Gothic',system-ui,sans-serif;background:#f4f1ea;color:#23302b;font-size:18px;line-height:1.45}
+button{font:inherit;cursor:pointer;border:1px solid #b9c4bc;background:#fff;color:#23302b;border-radius:10px;padding:10px 16px;min-height:44px}
+button.main{background:#1f5c4d;border-color:#1f5c4d;color:#fff;font-weight:700}
+button.warn{border-color:#b4543f;color:#8f3a28}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,.card:focus-visible{outline:3px solid #e2a23b;outline-offset:2px}
+input,textarea{font:inherit;border:1px solid #9fb0a5;border-radius:10px;padding:10px 12px;width:100%;background:#fff;color:#23302b}
+h1{font-size:26px;margin:0 0 6px} h2{font-size:21px;margin:0 0 10px}
+.wrap{max-width:1180px;margin:0 auto;padding:18px}
+.panel{background:#fff;border:1px solid #d9dfd8;border-radius:16px;padding:20px;margin-bottom:16px}
+.muted{color:#5d6b63;font-size:15px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#1f5c4d;color:#fff}
+.top b{font-size:19px} .top .sp{flex:1}
+.top button{min-height:40px;padding:6px 12px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#ffffff22;border-radius:999px;padding:4px 12px;font-size:15px}
+.net{font-size:15px;border-radius:999px;padding:4px 12px;background:#fff;color:#1f5c4d;font-weight:700}
+.net.off{background:#f6d7c9;color:#8f3a28}
+.banner{background:#f7e6b8;color:#5a4208;text-align:center;padding:10px;font-weight:700}
+.seatdot{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-size:14px;font-weight:700;flex:none}
+.s1{--c:#2f7de1}.s2{--c:#d1553f}.s3{--c:#2f9a5b}.s4{--c:#8a56c9}.s5{--c:#c98a16}.s6{--c:#3b8f9a}
+.seatdot{background:var(--c)}
+.board{position:relative;background:#fbfaf6;border:1px solid #d9dfd8;border-radius:18px;overflow:hidden;width:100%;height:calc(100vh - 190px);min-height:520px;touch-action:pan-y}
+.board svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.q{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(300px,44%);background:#1f5c4d;color:#fff;border-radius:16px;padding:14px 16px;text-align:center;font-weight:700;font-size:19px;word-break:keep-all;z-index:1}
+.q small{display:block;font-weight:400;font-size:13px;opacity:.85;margin-bottom:4px}
+.card{position:absolute;transform:translate(-50%,-50%);width:190px;background:#fff;border:3px solid var(--c);border-radius:14px;padding:8px 10px 6px;z-index:2;box-shadow:0 2px 6px #0001;word-break:keep-all;overflow-wrap:anywhere}
+.card.mine{cursor:grab;touch-action:none}
+.card.pick{box-shadow:0 0 0 5px #e2a23b}
+.card.gone{opacity:.45;border-style:dashed}
+.card .hd{display:flex;align-items:center;gap:6px;font-size:13px;color:#5d6b63;margin-bottom:2px}
+.card .tx{font-size:17px}
+.card .cm{border-top:1px dashed #cfd6cf;margin-top:6px;padding-top:4px;font-size:14px;display:flex;gap:5px;align-items:flex-start}
+.card .cm .seatdot{width:20px;height:20px;font-size:11px}
+.card .cm.gone{opacity:.45}
+.card .act{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.card .act button,.cm button{min-height:34px;padding:3px 9px;font-size:14px;border-radius:8px}
+.cm button{min-height:26px;padding:0 6px;margin-left:auto}
+.linkx{position:absolute;transform:translate(-50%,-50%);z-index:3;width:30px;height:30px;min-height:30px;padding:0;border-radius:50%;font-size:14px;line-height:1}
+.dock{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.dock textarea{height:54px;resize:none}
+.dock .cnt{font-size:13px;color:#5d6b63;text-align:right}
+.hint{background:#eaf3ee;border-radius:10px;padding:8px 12px;font-size:15px;margin-top:8px}
+.seats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:420px}
+.seats button{height:86px;font-size:26px;font-weight:700;border:3px solid var(--c);color:var(--c)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.gcard{background:#fff;border:1px solid #d9dfd8;border-radius:16px;padding:12px}
+.gcard.locked{border-color:#b4543f}
+.mini{position:relative;height:190px;background:#fbfaf6;border:1px solid #e1e5df;border-radius:12px;overflow:hidden;margin:8px 0}
+.mini i{position:absolute;transform:translate(-50%,-50%);width:34px;height:22px;border-radius:5px;background:var(--c);opacity:.85}
+.mini .mq{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:30px;border-radius:6px;background:#1f5c4d}
+.mini svg{position:absolute;inset:0;width:100%;height:100%}
+.qrbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qrbox .qr{background:#fff;padding:8px;border:1px solid #d9dfd8;border-radius:10px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#23302b;color:#fff;padding:12px 20px;border-radius:12px;z-index:50;max-width:92vw;text-align:center}
+dialog{border:0;border-radius:16px;padding:20px;max-width:min(560px,94vw);width:100%}
+dialog::backdrop{background:#0006}
+.big .board{height:calc(100vh - 150px)}
+@media (max-width:700px){body{font-size:17px}.card{width:150px}.board{height:calc(100vh - 230px)}.dock{flex-direction:column}.dock button{width:100%}.q{font-size:16px}}
+@media print{.noprint{display:none!important}.gcard{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+'use strict';
+/* 침묵의 대화 · 모둠판
+   학생: 모둠 링크(?j=참여토큰) → 번호 고르기 → 모둠판 (로그인 없음, 이름 입력 없음)
+   교사: ?t=1 → 구글 로그인 → 질문·모둠 수 → 모둠별 QR, 모든 모둠 보기·잠금·숨김·복구·전체 제시
+   연습: ?demo=1 (서버 없이 이 기기 안에서만 동작. 같은 브라우저의 여러 탭끼리 실시간 반영) */
+const CFG = { url: 'https://rdasqovxocztrxrbdipy.supabase.co', key: 'sb_publishable_Tzp5ngFfktgYcWc0ISjVlQ_HB9yQg-1' };
+const P = new URLSearchParams(location.search);
+const DEMO = P.has('demo');
+const $ = (s, el) => (el || document).querySelector(s);
+const el = (tag, attrs, ...kids) => {
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    const v = attrs[k];
+    if (v === false || v == null) continue;
+    if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+};
+const app = $('#app');
+const put = (node, ...kids) => node.replaceChildren(...kids.flat().filter(k => k != null && k !== false));
+let toastT;
+function say(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+const MSG = {
+  chalk_no_access: '이 링크로는 들어갈 수 없어요. 선생님께 새 링크를 받아요.',
+  chalk_seat_taken: '이미 다른 친구가 고른 번호예요. 다른 번호를 골라요.',
+  chalk_locked: '지금은 선생님이 판을 잠시 멈췄어요. 읽기만 할 수 있어요.',
+  chalk_too_fast: '조금 천천히 써요. 3초 뒤에 다시 붙일 수 있어요.',
+  chalk_too_many: '여기에는 더 붙일 수 없어요. (카드 8장, 덧붙임은 카드마다 3개, 연결선 12개까지)',
+  chalk_same_text: '이미 같은 것이 있어요.',
+  chalk_bad_text: '글자 수를 확인해요. (카드 80자, 덧붙임 40자까지)',
+  chalk_not_yours: '내가 만든 것만 고치거나 지울 수 있어요.',
+  chalk_no_card: '그 카드를 찾을 수 없어요.',
+  chalk_login_needed: '구글 로그인이 필요해요.',
+  chalk_bad_groups: '모둠 수는 1~12 사이로 정해요.'
+};
+const errText = e => { const k = Object.keys(MSG).find(k => String(e && e.message).includes(k)); return k ? MSG[k] : '연결이 잠시 끊겼어요. 다시 해 봐요.'; };
+
+/* ───────── 서버 연결(실제) / 연습용(이 기기 안) ───────── */
+let sb = null;
+const realApi = {
+  async rpc(fn, args) { const { data, error } = await sb.rpc(fn, args || {}); if (error) throw new Error(error.message); return data; },
+  listen(gid, cb) { const ch = sb.channel('chalk-' + gid, { config: { broadcast: { self: false } } }).on('broadcast', { event: 'v' }, cb).subscribe(); return ch; },
+  ping(ch) { if (ch) ch.send({ type: 'broadcast', event: 'v', payload: {} }); },
+  unlisten(ch) { if (ch) sb.removeChannel(ch); }
+};
+const demoApi = (() => {
+  const KEY = 'chalk-talk:group-demo-v1';
+  const bc = 'BroadcastChannel' in window ? new BroadcastChannel('chalk-talk-group-demo') : null;
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { rooms: [] }; } catch (e) { return { rooms: [] }; } };
+  const save = d => localStorage.setItem(KEY, JSON.stringify(d));
+  const id = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+  const fail = c => { throw new Error(c); };
+  const find = (d, pred) => { for (const r of d.rooms) for (const g of r.groups) if (pred(g, r)) return { r, g }; return null; };
+  const view = (r, g, mem, teacher) => ({
+    group_id: g.id, group_no: g.no, locked: g.locked, version: g.version, question: r.question,
+    presenting: !!r.present_group, present_me: r.present_group === g.id, seats: g.members.map(m => m.seat).sort(),
+    cards: g.cards.filter(c => teacher || (!c.hidden && !c.deleted)).map(c => ({ id: c.id, seat: c.seat, body: c.body, x: c.x, y: c.y, mine: !!mem && c.member === mem.id, hidden: c.hidden, deleted: c.deleted })),
+    comments: g.comments.filter(k => !k.deleted && (teacher || !k.hidden)).map(k => ({ id: k.id, card: k.card, seat: k.seat, body: k.body, mine: !!mem && k.member === mem.id, hidden: k.hidden })),
+    links: g.links.filter(l => !l.deleted).map(l => ({ id: l.id, a: l.a, b: l.b, seat: l.seat, mine: !!mem && l.member === mem.id }))
+  });
+  const fns = {
+    chalk_peek(d, a) { const f = find(d, g => g.join_token === a.p_join) || fail('chalk_no_access'); return { group_no: f.g.no, question: f.r.question, seats: f.g.members.map(m => m.seat).sort() }; },
+    chalk_join(d, a) { const f = find(d, g => g.join_token === a.p_join) || fail('chalk_no_access'); if (f.g.members.some(m => m.seat === a.p_seat)) fail('chalk_seat_taken'); const tok = id() + id(); f.g.members.push({ id: id(), seat: a.p_seat, token: tok, last: 0 }); f.g.version++; return { token: tok, seat: a.p_seat }; },
+    chalk_state(d, a) { const f = find(d, g => g.members.some(m => m.token === a.p_token)) || fail('chalk_no_access'); const m = f.g.members.find(m => m.token === a.p_token); return Object.assign(view(f.r, f.g, m, false), { seat: m.seat }); },
+    chalk_write(d, a) {
+      const f = find(d, g => g.members.some(m => m.token === a.p_token)) || fail('chalk_no_access'); const g = f.g, m = g.members.find(m => m.token === a.p_token);
+      if (g.locked || f.r.present_group) fail('chalk_locked');
+      const txt = String(a.p_body || '').trim(), x = Math.min(96, Math.max(4, a.p_x == null ? 50 : a.p_x)), y = Math.min(94, Math.max(6, a.p_y == null ? 50 : a.p_y));
+      const mineCard = () => g.cards.find(c => c.id === a.p_id && c.member === m.id && !c.deleted) || fail('chalk_not_yours'); let nid = null;
+      if (a.p_action === 'add_card') { if (!txt || txt.length > 80) fail('chalk_bad_text'); if (Date.now() - m.last < 3000) fail('chalk_too_fast'); const mine = g.cards.filter(c => c.member === m.id && !c.deleted); if (mine.length >= 8) fail('chalk_too_many'); if (mine.some(c => c.body === txt)) fail('chalk_same_text'); nid = id(); g.cards.push({ id: nid, member: m.id, seat: m.seat, body: txt, x, y, hidden: false, deleted: false }); }
+      else if (a.p_action === 'edit_card') { if (!txt || txt.length > 80) fail('chalk_bad_text'); mineCard().body = txt; }
+      else if (a.p_action === 'move_card') { const c = mineCard(); c.x = x; c.y = y; }
+      else if (a.p_action === 'del_card') { mineCard().deleted = true; }
+      else if (a.p_action === 'add_comment') { if (!txt || txt.length > 40) fail('chalk_bad_text'); if (!g.cards.some(c => c.id === a.p_id && !c.deleted && !c.hidden)) fail('chalk_no_card'); if (g.comments.filter(k => k.card === a.p_id && k.member === m.id && !k.deleted).length >= 3) fail('chalk_too_many'); nid = id(); g.comments.push({ id: nid, card: a.p_id, member: m.id, seat: m.seat, body: txt, hidden: false, deleted: false }); }
+      else if (a.p_action === 'del_comment') { (g.comments.find(k => k.id === a.p_id && k.member === m.id && !k.deleted) || fail('chalk_not_yours')).deleted = true; }
+      else if (a.p_action === 'add_link') { const ok = i => g.cards.some(c => c.id === i && !c.deleted && !c.hidden); if (!a.p_id || a.p_id === a.p_other || !ok(a.p_id) || !ok(a.p_other)) fail('chalk_no_card'); if (g.links.some(l => !l.deleted && ((l.a === a.p_id && l.b === a.p_other) || (l.a === a.p_other && l.b === a.p_id)))) fail('chalk_same_text'); if (g.links.filter(l => l.member === m.id && !l.deleted).length >= 12) fail('chalk_too_many'); nid = id(); g.links.push({ id: nid, a: a.p_id, b: a.p_other, member: m.id, seat: m.seat, deleted: false }); }
+      else if (a.p_action === 'del_link') { (g.links.find(l => l.id === a.p_id && l.member === m.id && !l.deleted) || fail('chalk_not_yours')).deleted = true; }
+      else fail('chalk_bad_action');
+      m.last = Date.now(); g.version++; return { ok: true, id: nid };
+    },
+    chalk_create_room(d, a) { const q = String(a.p_question || '').trim(); if (!q || q.length > 200) fail('chalk_bad_text'); if (!(a.p_groups >= 1 && a.p_groups <= 12)) fail('chalk_bad_groups'); const r = { id: id(), question: q, present_group: null, created_at: new Date().toISOString(), groups: [] }; for (let i = 1; i <= a.p_groups; i++) r.groups.push({ id: id(), no: i, join_token: id().replace(/-/g, ''), locked: false, version: 0, members: [], cards: [], comments: [], links: [] }); d.rooms.push(r); return { room: r.id }; },
+    chalk_my_rooms(d) { return d.rooms.map(r => ({ id: r.id, question: r.question, created_at: r.created_at, groups: r.groups.length })).reverse(); },
+    chalk_teacher_state(d, a) { const r = d.rooms.find(r => r.id === a.p_room) || fail('chalk_no_access'); return { room: r.id, question: r.question, present_group: r.present_group, groups: r.groups.map(g => Object.assign(view(r, g, null, true), { join_token: g.join_token })) }; },
+    chalk_teacher_action(d, a) {
+      const r = d.rooms.find(r => r.id === a.p_room) || fail('chalk_no_access'); const on = a.p_on !== false; const all = k => r.groups.flatMap(g => g[k]);
+      if (a.p_action === 'lock_group') r.groups.filter(g => g.id === a.p_target).forEach(g => g.locked = on);
+      else if (a.p_action === 'lock_all') r.groups.forEach(g => g.locked = on);
+      else if (a.p_action === 'hide_card') all('cards').filter(c => c.id === a.p_target).forEach(c => c.hidden = on);
+      else if (a.p_action === 'restore_card') all('cards').filter(c => c.id === a.p_target).forEach(c => { c.deleted = false; c.hidden = false; });
+      else if (a.p_action === 'hide_comment') all('comments').filter(k => k.id === a.p_target).forEach(k => k.hidden = on);
+      else if (a.p_action === 'release_seat') r.groups.filter(g => g.id === a.p_target).forEach(g => g.members = g.members.filter(m => m.seat !== a.p_seat));
+      else if (a.p_action === 'present') r.present_group = a.p_target || null;
+      else if (a.p_action === 'delete_room') { d.rooms = d.rooms.filter(x => x !== r); return { ok: true }; }
+      else fail('chalk_bad_action');
+      r.groups.forEach(g => g.version++); return { ok: true };
+    }
+  };
+  return {
+    async rpc(fn, args) { const d = load(); const out = fns[fn](d, args || {}); if (!/_(peek|state|my_rooms)$/.test(fn)) save(d); return out; },
+    listen(gid, cb) { if (!bc) return null; const h = () => cb(); bc.addEventListener('message', h); return h; },
+    ping() { if (bc) bc.postMessage(1); },
+    unlisten(h) { if (bc && h) bc.removeEventListener('message', h); }
+  };
+})();
+const api = DEMO ? demoApi : realApi;
+const selfUrl = extra => { const u = new URL(location.href); u.search = ''; u.hash = ''; const q = new URLSearchParams(extra); if (DEMO) q.set('demo', '1'); u.search = q.toString(); return u.toString(); };
+
+/* ───────── 판 그리기 (학생·교사 공용) ───────── */
+const SHAPE = ['', '●', '■', '▲', '◆', '★', '♥'];
+const seatDot = n => el('span', { class: 'seatdot s' + n, title: n + '번' }, String(n));
+function drawBoard(host, st, o) {
+  // o: {role:'student'|'teacher'|'show', pick, onCard(action, card), onComment(action, k), onLink(l), onMove(card,x,y)}
+  host.textContent = '';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'none'); host.append(svg);
+  host.append(el('div', { class: 'q' }, el('small', { text: '함께 생각할 질문' }), st.question));
+  const shown = new Map(st.cards.filter(c => o.role === 'teacher' || (!c.hidden && !c.deleted)).map(c => [c.id, c]));
+  const colors = { 1: '#2f7de1', 2: '#d1553f', 3: '#2f9a5b', 4: '#8a56c9', 5: '#c98a16', 6: '#3b8f9a' };
+  for (const l of st.links) {
+    const a = shown.get(l.a), b = shown.get(l.b); if (!a || !b || a.deleted || b.deleted) continue;
+    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y); ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y);
+    ln.setAttribute('stroke', colors[l.seat] || '#555'); ln.setAttribute('stroke-width', '3'); ln.setAttribute('vector-effect', 'non-scaling-stroke'); ln.setAttribute('stroke-linecap', 'round');
+    svg.append(ln);
+    if (o.role === 'student' && l.mine && !o.readonly) host.append(el('button', { class: 'linkx', style: `left:${(a.x + b.x) / 2}%;top:${(a.y + b.y) / 2}%`, 'aria-label': '내가 만든 연결선 지우기', onclick: () => o.onLink(l) }, '✕'));
+  }
+  for (const c of shown.values()) {
+    const kids = st.comments.filter(k => k.card === c.id);
+    const mine = o.role === 'student' && c.mine && !o.readonly;
+    const card = el('div', { class: `card s${c.seat}` + (mine ? ' mine' : '') + (o.pick === c.id ? ' pick' : '') + (c.hidden || c.deleted ? ' gone' : ''), style: `left:${c.x}%;top:${c.y}%`, tabindex: '0', 'data-id': c.id },
+      el('div', { class: 'hd' }, seatDot(c.seat), SHAPE[c.seat] + ' ' + c.seat + '번' + (c.mine ? ' · 내 카드' : '') + (c.deleted ? ' · 학생이 지움' : c.hidden ? ' · 숨김' : '')),
+      el('div', { class: 'tx', text: c.body }),
+      kids.map(k => el('div', { class: 'cm' + (k.hidden ? ' gone' : '') }, seatDot(k.seat), el('span', { text: k.body }),
+        o.role === 'student' && k.mine && !o.readonly ? el('button', { 'aria-label': '내 덧붙임 지우기', onclick: e => { e.stopPropagation(); o.onComment('del', k); } }, '✕') : null,
+        o.role === 'teacher' ? el('button', { onclick: () => o.onComment('hide', k) }, k.hidden ? '보이기' : '숨김') : null)));
+    if (o.role === 'student' && !o.readonly) {
+      const act = el('div', { class: 'act' });
+      if (o.pick && o.pick !== c.id) act.append(el('button', { class: 'main', onclick: () => o.onCard('linkto', c) }, '여기에 잇기'));
+      else if (o.pick === c.id) act.append(el('button', { onclick: () => o.onCard('unpick', c) }, '잇기 그만'));
+      else {
+        if (c.mine) act.append(el('button', { onclick: () => o.onCard('edit', c) }, '고치기'), el('button', { onclick: () => o.onCard('del', c) }, '지우기'));
+        else act.append(el('button', { onclick: () => o.onCard('comment', c) }, '덧붙이기'));
+        act.append(el('button', { onclick: () => o.onCard('pick', c) }, '잇기'));
+      }
+      card.append(act);
+      if (mine) dragCard(card, host, c, o);
+    }
+    if (o.role === 'teacher') card.append(el('div', { class: 'act' },
+      c.deleted ? el('button', { onclick: () => o.onCard('restore', c) }, '되살리기') : el('button', { onclick: () => o.onCard('hide', c) }, c.hidden ? '다시 보이기' : '숨김')));
+    host.append(card);
+  }
+}
+function dragCard(card, host, c, o) {
+  let start = null;
+  card.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; start = { x: e.clientX, y: e.clientY, moved: false }; card.setPointerCapture(e.pointerId); });
+  card.addEventListener('pointermove', e => {
+    if (!start) return; if (!start.moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 8) return; start.moved = true;
+    const r = host.getBoundingClientRect(); c.x = Math.min(96, Math.max(4, (e.clientX - r.left) / r.width * 100)); c.y = Math.min(94, Math.max(6, (e.clientY - r.top) / r.height * 100));
+    card.style.left = c.x + '%'; card.style.top = c.y + '%'; card.style.cursor = 'grabbing';
+  });
+  const end = () => { if (start && start.moved) o.onMove(c, c.x, c.y); start = null; card.style.cursor = ''; };
+  card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+  card.addEventListener('keydown', e => { const d = { ArrowLeft: [-4, 0], ArrowRight: [4, 0], ArrowUp: [0, -4], ArrowDown: [0, 4] }[e.key]; if (!d || e.target !== card) return; e.preventDefault(); o.onMove(c, c.x + d[0], c.y + d[1]); });
+}
+function askText(title, example, max, init) {
+  return new Promise(res => {
+    const ta = el('textarea', { maxlength: max, rows: 3, placeholder: example }); ta.value = init || '';
+    const cnt = el('div', { class: 'muted', text: (init || '').length + ' / ' + max + '자' }); ta.addEventListener('input', () => cnt.textContent = ta.value.length + ' / ' + max + '자');
+    const d = el('dialog', {}, el('h2', { text: title }), el('p', { class: 'muted', text: example }), ta, cnt,
+      el('div', { class: 'row', style: 'margin-top:12px;justify-content:flex-end' }, el('button', { onclick: () => { d.close(); d.remove(); res(null); } }, '그만두기'),
+        el('button', { class: 'main', onclick: () => { const v = ta.value.trim(); d.close(); d.remove(); res(v || null); } }, '붙이기')));
+    d.addEventListener('cancel', () => { d.remove(); res(null); }); document.body.append(d); d.showModal(); ta.focus();
+  });
+}
+
+/* ───────── 학생 ───────── */
+const tokKey = j => 'chalk-talk:group-token:' + j;
+async function studentStart(join) {
+  const saved = localStorage.getItem(tokKey(join));
+  if (saved) { try { await api.rpc('chalk_state', { p_token: saved }); return studentBoard(join, saved); } catch (e) { if (String(e.message).includes('chalk_no_access')) localStorage.removeItem(tokKey(join)); } }
+  let info; try { info = await api.rpc('chalk_peek', { p_join: join }); } catch (e) { return put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '들어갈 수 없어요' }), el('p', { text: errText(e) })))); }
+  const pick = async n => { try { const r = await api.rpc('chalk_join', { p_join: join, p_seat: n }); localStorage.setItem(tokKey(join), r.token); api.ping(null); studentBoard(join, r.token); } catch (e) { say(errText(e)); studentStart(join); } };
+  put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' },
+    el('p', { class: 'muted', text: '침묵의 대화 · ' + info.group_no + '모둠' }), el('h1', { text: info.question }),
+    el('p', { text: '내 모둠 번호를 골라요. 이름은 쓰지 않아요.' }),
+    el('div', { class: 'seats' }, [1, 2, 3, 4, 5, 6].map(n => el('button', { class: 's' + n, disabled: info.seats.includes(n), onclick: () => pick(n) }, SHAPE[n] + ' ' + n + '번'))),
+    el('p', { class: 'muted', text: '회색 번호는 친구가 이미 골랐어요. 내 번호인데 회색이면 선생님께 「번호 풀기」를 부탁해요.' }))));
+}
+function studentBoard(join, token) {
+  let st = null, pick = null, ch = null, busy = false, online = true, pending = 0;
+  const net = el('span', { class: 'net', text: '저장됨' }), lockB = el('div', { class: 'banner', hidden: true }), board = el('div', { class: 'board' });
+  const ta = el('textarea', { maxlength: 80, placeholder: '예) 안 입는 옷을 바꿔 입는 날을 만들면 좋겠어. 새 옷을 덜 사게 되니까.', 'aria-label': '내 생각 카드' });
+  const cnt = el('div', { class: 'cnt', text: '0 / 80자' }); ta.addEventListener('input', () => cnt.textContent = ta.value.length + ' / 80자');
+  const addBtn = el('button', { class: 'main', disabled: true, onclick: addCard }, '＋ 내 생각 카드 붙이기');
+  const who = el('span', { class: 'pill' }), title = el('b');
+  put(app, el('div', { class: 'top' }, title, who, el('span', { class: 'sp' }), net), lockB,
+    el('div', { class: 'wrap' }, board, el('div', { class: 'dock' }, el('div', { style: 'flex:1' }, ta, cnt), addBtn),
+      el('div', { class: 'hint', text: '말하지 않고 글로 이야기해요. 친구 카드에는 「덧붙이기」로 질문이나 생각을 달고, 「잇기」로 이어지는 카드끼리 선을 그어요.' })));
+  const setNet = () => { net.className = 'net' + (online ? '' : ' off'); net.textContent = !online ? '연결 끊김 · 다시 연결 중' : pending ? '저장하는 중…' : '저장됨'; };
+  const paint = () => {
+    const ro = st.locked || st.presenting;
+    title.textContent = st.group_no + '모둠'; put(who, seatDot(st.seat), ' 나는 ' + st.seat + '번');
+    lockB.hidden = !ro; lockB.textContent = st.presenting ? (st.present_me ? '선생님이 우리 모둠 판을 모두에게 보여 주고 있어요.' : '선생님이 다른 모둠 판을 보여 주고 있어요. 앞을 봐요.') : '선생님이 판을 잠시 멈췄어요. 읽기만 할 수 있어요.';
+    ta.disabled = addBtn.disabled = ro; if (ro) pick = null;
+    drawBoard(board, st, { role: 'student', pick, readonly: ro, onCard, onComment, onLink, onMove });
+  };
+  async function refresh() { if (busy) return; busy = true; try { const s = await api.rpc('chalk_state', { p_token: token }); online = true; if (!st || s.version !== st.version || s.locked !== st.locked || s.presenting !== st.presenting) { st = s; if (!document.querySelector('dialog[open]') && !dragging()) paint(); } if (!ch) ch = api.listen(st.group_id, refresh); } catch (e) { if (String(e.message).includes('chalk_no_access')) { localStorage.removeItem(tokKey(join)); clearInterval(timer); api.unlisten(ch); say('번호가 풀렸어요. 다시 골라요.'); return studentStart(join); } online = false; } finally { busy = false; setNet(); } }
+  const dragging = () => !!board.querySelector('.card[style*="grabbing"]');
+  async function write(action, a) { pending++; setNet(); try { await api.rpc('chalk_write', Object.assign({ p_token: token, p_action: action }, a)); api.ping(ch); return true; } catch (e) { say(errText(e)); return false; } finally { pending--; await refresh(); if (st) paint(); } }
+  async function addCard() { if (!st) return; const v = ta.value.trim(); if (!v) return say('카드에 쓸 생각을 먼저 적어요.'); const mine = st.cards.filter(c => c.mine).length, ang = (st.seat * 1.3 + mine * 0.9), rad = 30 + (mine % 3) * 6; if (await write('add_card', { p_body: v, p_x: 50 + Math.cos(ang) * rad * 1.2, p_y: 50 + Math.sin(ang) * rad })) { ta.value = ''; cnt.textContent = '0 / 80자'; } }
+  async function onCard(act, c) {
+    if (act === 'pick') { pick = c.id; say('이 카드와 이어지는 카드에서 「여기에 잇기」를 눌러요.'); return paint(); }
+    if (act === 'unpick') { pick = null; return paint(); }
+    if (act === 'linkto') { const a = pick; pick = null; return write('add_link', { p_id: a, p_other: c.id }); }
+    if (act === 'edit') { const v = await askText('내 카드 고치기', '예) 까닭을 한 문장 더 써 보면 어때요?', 80, c.body); if (v) write('edit_card', { p_id: c.id, p_body: v }); return; }
+    if (act === 'del') { if (confirm('이 카드를 지울까요? 달린 덧붙임과 연결선도 함께 안 보이게 돼요.')) write('del_card', { p_id: c.id }); return; }
+    if (act === 'comment') { const v = await askText(c.seat + '번 친구 카드에 덧붙이기', '예) 왜 그렇게 생각했어? / 나도 비슷해. 그런데 …', 40); if (v) write('add_comment', { p_id: c.id, p_body: v }); }
+  }
+  const onComment = (act, k) => write('del_comment', { p_id: k.id });
+  const onLink = l => { if (confirm('내가 그은 연결선을 지울까요?')) write('del_link', { p_id: l.id }); };
+  const onMove = (c, x, y) => write('move_card', { p_id: c.id, p_x: x, p_y: y });
+  const timer = setInterval(refresh, DEMO ? 2500 : 8000);
+  window.addEventListener('online', refresh); window.addEventListener('offline', () => { online = false; setNet(); });
+  refresh();
+}
+
+/* ───────── 교사 ───────── */
+async function teacherStart() {
+  if (!DEMO) {
+    const { data } = await sb.auth.getSession();
+    if (!data.session) return put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판 (선생님)' }),
+      el('p', { text: '모둠마다 따로 쓰는 판을 만들고, 모든 모둠의 판을 한 화면에서 살펴봅니다.' }),
+      el('p', { class: 'muted', text: '선생님만 구글 계정으로 로그인합니다. 학생은 로그인하지 않고, 이름도 적지 않습니다.' }),
+      el('div', { class: 'row' }, el('button', { class: 'main', onclick: () => sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: selfUrl({ t: '1' }) } }) }, '구글로 로그인'),
+        el('a', { href: selfUrl({ t: '1', demo: '1' }) }, '로그인 없이 연습해 보기')))));
+  }
+  const rooms = await api.rpc('chalk_my_rooms');
+  const q = el('input', { maxlength: 200, placeholder: '예) 옷 쓰레기를 줄이려면, 누가 무엇을 바꿔야 할까?' }), n = el('input', { type: 'number', min: 1, max: 12, value: 6, style: 'width:110px' });
+  const make = async () => { try { const r = await api.rpc('chalk_create_room', { p_question: q.value, p_groups: Number(n.value) }); location.href = selfUrl({ t: '1', room: r.room }); } catch (e) { say(e.message.includes('chalk_bad_text') ? '함께 생각할 질문을 적어 주세요.' : errText(e)); } };
+  put(app, el('div', { class: 'wrap' },
+    el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판 만들기' }), DEMO ? el('p', { class: 'hint', text: '연습 모드입니다. 이 기기 안에서만 동작하고, 같은 브라우저의 다른 탭에서 학생 화면을 열어 볼 수 있습니다.' }) : null,
+      el('label', {}, '함께 생각할 질문', q), el('div', { class: 'row', style: 'margin-top:12px' }, el('label', {}, '모둠 수 ', n), el('button', { class: 'main', onclick: make }, '모둠판 만들기')),
+      el('p', { class: 'muted', text: '질문과 모둠 수만 정하면 모둠별 QR이 만들어집니다. 판은 7일 뒤 자동으로 지워집니다.' })),
+    rooms.length ? el('div', { class: 'panel' }, el('h2', { text: '만들어 둔 모둠판' }), rooms.map(r => el('p', {}, el('a', { href: selfUrl({ t: '1', room: r.id }) }, r.question), el('span', { class: 'muted', text: ' · ' + r.groups + '모둠 · ' + new Date(r.created_at).toLocaleDateString('ko-KR') })))) : null));
+}
+function teacherRoom(roomId) {
+  let st = null, open = null, chans = [], busy = false, sig = '';
+  const head = el('div', { class: 'top noprint' }), body = el('div', { class: 'wrap' }); put(app, head, body);
+  const act = async (action, a) => { try { await api.rpc('chalk_teacher_action', Object.assign({ p_room: roomId, p_action: action }, a)); chans.forEach(c => api.ping(c)); if (DEMO) api.ping(); } catch (e) { say(errText(e)); } await refresh(true); };
+  async function refresh(force) {
+    if (busy) return; busy = true;
+    try { const s = await api.rpc('chalk_teacher_state', { p_room: roomId }); const ns = s.groups.map(g => g.version + (g.locked ? 'L' : '')).join(',') + s.present_group; if (!chans.length) chans = DEMO ? [api.listen(null, () => refresh())] : s.groups.map(g => api.listen(g.group_id, () => refresh())); st = s; if (force || ns !== sig) { sig = ns; if (!document.querySelector('dialog[open]')) paint(); } }
+    catch (e) { put(body, el('div', { class: 'panel' }, el('h1', { text: '이 모둠판을 열 수 없습니다' }), el('p', { text: '지워졌거나, 다른 계정으로 만든 판입니다.' }), el('a', { href: selfUrl({ t: '1' }) }, '처음으로'))); clearInterval(timer); }
+    finally { busy = false; }
+  }
+  const linkOf = g => selfUrl({ j: g.join_token });
+  function showQR(g) {
+    const box = el('div', { class: 'qr' }); const d = el('dialog', {}, el('h2', { text: g.group_no + '모둠 들어오는 길' }), el('div', { class: 'qrbox' }, box, el('div', {}, el('p', { text: '태블릿 카메라로 찍거나 아래 주소를 열어요.' }), el('input', { readonly: true, value: linkOf(g), onclick: e => e.target.select() }),
+      el('div', { class: 'row', style: 'margin-top:10px' }, el('button', { onclick: () => navigator.clipboard.writeText(linkOf(g)).then(() => say('주소를 복사했습니다.')) }, '주소 복사'), el('button', { onclick: () => window.open(linkOf(g), '_blank') }, '새 탭에서 열기')))),
+      el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'main', onclick: () => { d.close(); d.remove(); } }, '닫기')));
+    document.body.append(d); d.showModal(); if (window.QRCode) new QRCode(box, { text: linkOf(g), width: 200, height: 200 });
+  }
+  function paint() {
+    const allLocked = st.groups.every(g => g.locked), pres = st.groups.find(g => g.group_id === st.present_group);
+    put(head, el('b', { text: '침묵의 대화 · 선생님 화면' }), el('span', { class: 'pill', text: st.question }), el('span', { class: 'sp' }),
+      open ? el('button', { onclick: () => { open = null; paint(); } }, '‹ 모든 모둠') : null,
+      el('button', { onclick: () => act('lock_all', { p_on: !allLocked }) }, allLocked ? '모든 모둠 다시 쓰기' : '모든 모둠 잠시 멈춤'),
+      pres ? el('button', { class: 'main', onclick: () => act('present', { p_target: null }) }, '보여 주기 끝') : null,
+      el('button', { class: 'warn', onclick: async () => { if (confirm('이 모둠판과 학생 글을 모두 지울까요? 되돌릴 수 없습니다.')) { await api.rpc('chalk_teacher_action', { p_room: roomId, p_action: 'delete_room' }); location.href = selfUrl({ t: '1' }); } } }, '판 지우기'));
+    if (pres && !open) open = pres.group_id;
+    const g = open && st.groups.find(x => x.group_id === open);
+    if (g) {
+      const board = el('div', { class: 'board' });
+      body.className = 'wrap big';
+      put(body, el('div', { class: 'row noprint', style: 'margin-bottom:10px' }, el('h2', { style: 'margin:0', text: g.group_no + '모둠' }),
+        g.seats.map(s => el('button', { title: '기기를 바꾸거나 번호를 잘못 골랐을 때', onclick: () => { if (confirm(s + '번 자리를 풀까요? 그 학생은 번호를 다시 골라야 하고, 전에 쓴 카드는 남지만 고칠 수 없게 됩니다.')) act('release_seat', { p_target: g.group_id, p_seat: s }); } }, s + '번 풀기')),
+        el('span', { style: 'flex:1' }), el('button', { onclick: () => act('lock_group', { p_target: g.group_id, p_on: !g.locked }) }, g.locked ? '다시 쓰기' : '잠시 멈춤'),
+        st.present_group === g.group_id ? el('span', { class: 'net', text: '모두에게 보여 주는 중 · 학생 입력 멈춤' }) : el('button', { class: 'main', onclick: () => act('present', { p_target: g.group_id }) }, '이 판을 모두에게 보여 주기')), board);
+      drawBoard(board, g, { role: st.present_group === g.group_id ? 'show' : 'teacher', onCard: (a, c) => act(a === 'restore' ? 'restore_card' : 'hide_card', { p_target: c.id, p_on: !c.hidden }), onComment: (a, k) => act('hide_comment', { p_target: k.id, p_on: !k.hidden }) });
+      return;
+    }
+    body.className = 'wrap';
+    const colors = { 1: '#2f7de1', 2: '#d1553f', 3: '#2f9a5b', 4: '#8a56c9', 5: '#c98a16', 6: '#3b8f9a' };
+    put(body, el('p', { class: 'muted noprint', text: '모둠 판을 누르면 크게 열립니다. 학생은 자기 모둠 판만 볼 수 있고, 선생님이 고른 판만 모두에게 보여 줄 수 있습니다.' }),
+      el('div', { class: 'grid' }, st.groups.map(g => {
+        const live = g.cards.filter(c => !c.deleted && !c.hidden), mini = el('div', { class: 'mini', role: 'button', tabindex: '0', 'aria-label': g.group_no + '모둠 판 크게 보기', onclick: () => { open = g.group_id; paint(); }, onkeydown: e => { if (e.key === 'Enter') { open = g.group_id; paint(); } } });
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('preserveAspectRatio', 'none'); mini.append(svg);
+        g.links.forEach(l => { const a = live.find(c => c.id === l.a), b = live.find(c => c.id === l.b); if (!a || !b) return; const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'); ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y); ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y); ln.setAttribute('stroke', colors[l.seat]); ln.setAttribute('stroke-width', '2'); ln.setAttribute('vector-effect', 'non-scaling-stroke'); svg.append(ln); });
+        mini.append(el('span', { class: 'mq' }), ...live.map(c => el('i', { class: 's' + c.seat, style: `left:${c.x}%;top:${c.y}%` })));
+        return el('div', { class: 'gcard' + (g.locked ? ' locked' : '') }, el('div', { class: 'row' }, el('b', { text: g.group_no + '모둠' }), g.seats.map(seatDot), g.seats.length ? null : el('span', { class: 'muted', text: '아직 아무도 없음' }), el('span', { style: 'flex:1' }), g.locked ? el('span', { class: 'muted', text: '멈춤' }) : null),
+          mini, el('div', { class: 'muted', text: `카드 ${live.length} · 덧붙임 ${g.comments.filter(k => !k.hidden).length} · 연결 ${g.links.length}` + (g.cards.some(c => c.hidden) ? ' · 숨긴 카드 있음' : '') }),
+          el('div', { class: 'row noprint', style: 'margin-top:8px' }, el('button', { onclick: () => showQR(g) }, 'QR·주소'), el('button', { onclick: () => act('lock_group', { p_target: g.group_id, p_on: !g.locked }) }, g.locked ? '다시 쓰기' : '잠시 멈춤'), el('button', { onclick: () => { open = g.group_id; paint(); } }, '크게 보기')));
+      })));
+  }
+  const timer = setInterval(() => refresh(), DEMO ? 2500 : 8000); refresh(true);
+}
+
+/* ───────── 시작 ───────── */
+(async function () {
+  try {
+    if (!DEMO) sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { storageKey: 'chalk-talk-group-auth', detectSessionInUrl: true, flowType: 'pkce' } });
+    if (P.get('j')) return studentStart(P.get('j'));
+    if (P.get('room')) return teacherRoom(P.get('room'));
+    if (P.has('t') || DEMO) return teacherStart();
+    put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판' }),
+      el('p', { text: '말하지 않고 글과 선으로 생각을 주고받는 모둠 활동입니다.' }),
+      el('p', { text: '학생은 선생님이 보여 준 모둠 QR을 찍어 들어옵니다.' }),
+      el('div', { class: 'row' }, el('a', { href: selfUrl({ t: '1' }) }, el('button', { class: 'main' }, '선생님: 모둠판 만들기')), el('a', { href: selfUrl({ t: '1', demo: '1' }) }, el('button', {}, '연습해 보기')), el('a', { href: './' }, el('button', {}, '혼자 쓰는 그림판'))))));
+  } catch (e) { put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '화면을 열지 못했어요' }), el('p', { text: '인터넷 연결을 확인하고 다시 열어 주세요.' })))); }
+})();
+</script>
+</body>
+</html>
