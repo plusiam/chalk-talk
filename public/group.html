@@ -61,6 +61,7 @@ h1{font-size:26px;margin:0 0 6px} h2{font-size:21px;margin:0 0 10px}
 .mini svg{position:absolute;inset:0;width:100%;height:100%}
 .qrbox{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .qrbox .qr{background:#fff;padding:8px;border:1px solid #d9dfd8;border-radius:10px}
+.tbl{width:100%;border-collapse:collapse;font-size:16px}.tbl th,.tbl td{text-align:left;padding:8px 6px;border-bottom:1px solid #e3e7e2;vertical-align:middle;white-space:nowrap}.tbl td button{min-height:36px;padding:4px 10px}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#23302b;color:#fff;padding:12px 20px;border-radius:12px;z-index:50;max-width:92vw;text-align:center}
 dialog{border:0;border-radius:16px;padding:20px;max-width:min(560px,94vw);width:100%}
 dialog::backdrop{background:#0006}
@@ -110,7 +111,8 @@ const MSG = {
   chalk_not_yours: '내가 만든 것만 고치거나 지울 수 있어요.',
   chalk_no_card: '그 카드를 찾을 수 없어요.',
   chalk_login_needed: '구글 로그인이 필요해요.',
-  chalk_bad_groups: '모둠 수는 1~12 사이로 정해요.'
+  chalk_bad_groups: '모둠 수는 1~12 사이로 정해요.',
+  chalk_not_teacher: '초대받은 선생님만 판을 만들 수 있습니다. 초대 코드를 먼저 적어 주세요.'
 };
 const errText = e => { const k = Object.keys(MSG).find(k => String(e && e.message).includes(k)); return k ? MSG[k] : '연결이 잠시 끊겼어요. 다시 해 봐요.'; };
 
@@ -118,7 +120,8 @@ const errText = e => { const k = Object.keys(MSG).find(k => String(e && e.messag
 let sb = null;
 const realApi = {
   async rpc(fn, args) { const { data, error } = await sb.rpc(fn, args || {}); if (error) throw new Error(error.message); return data; },
-  listen(gid, cb) { const ch = sb.channel('chalk-' + gid, { config: { broadcast: { self: false } } }).on('broadcast', { event: 'v' }, cb).subscribe(); return ch; },
+  listen(gid, cb) { const ch = sb.channel('chalk-' + gid, { config: { broadcast: { self: false } } }).on('broadcast', { event: 'v' }, cb); ch.chalkLive = false; ch.subscribe(s => { const was = ch.chalkLive; ch.chalkLive = s === 'SUBSCRIBED'; if (ch.chalkLive && !was) cb(); }); return ch; },
+  live(ch) { return !!(ch && ch.chalkLive); },
   ping(ch) { if (ch) ch.send({ type: 'broadcast', event: 'v', payload: {} }); },
   unlisten(ch) { if (ch) sb.removeChannel(ch); }
 };
@@ -174,8 +177,30 @@ const demoApi = (() => {
       r.groups.forEach(g => g.version++); return { ok: true };
     }
   };
+  Object.assign(fns, {
+    chalk_me(d) { return { login: true, teacher: !P.has('guest') || !!d.guestOk, admin: P.has('asadmin') }; },
+    chalk_redeem(d, a) {
+      const c = String(a.p_code || '').trim().toUpperCase(); const inv = (d.invites || []).find(i => i.code === c && !i.disabled);
+      if (c !== 'DEMO1234' && !inv) return { ok: false, error: 'chalk_bad_code' };
+      if (inv) { if (inv.used >= inv.max_uses) return { ok: false, error: 'chalk_code_used_up' }; inv.used++; d.teachers = d.teachers || []; d.teachers.push({ user_id: id(), email: '연습 선생님 ' + (d.teachers.length + 1), approved_at: new Date().toISOString(), label: inv.label, revoked: false, rooms: 0 }); }
+      d.guestOk = true; return { ok: true };
+    },
+    chalk_admin_state(d) {
+      const sum = k => d.rooms.reduce((n, r) => n + r.groups.reduce((m, g) => m + g[k].length, 0), 0);
+      return { invites: (d.invites || []).slice().reverse(), teachers: (d.teachers || []).slice().reverse(), now: { rooms: d.rooms.length, expired_rooms: 0, seats: sum('members'), cards: sum('cards') } };
+    },
+    chalk_admin_action(d, a) {
+      d.invites = d.invites || []; d.teachers = d.teachers || [];
+      if (a.p_action === 'create_invite') { const lb = String(a.p_label || '').trim(); if (!lb) fail('chalk_bad_text'); const code = id().replace(/-/g, '').slice(0, 8).toUpperCase(); d.invites.push({ id: id(), code, label: lb, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + (a.p_days || 14) * 864e5).toISOString(), max_uses: a.p_max || 50, used: 0, disabled: false, expired: false }); return { ok: true, code }; }
+      const inv = d.invites.find(i => i.id === a.p_id), t = d.teachers.find(t => t.user_id === a.p_id);
+      if (a.p_action === 'disable_invite' && inv) inv.disabled = true; else if (a.p_action === 'enable_invite' && inv) inv.disabled = false;
+      else if (a.p_action === 'revoke_teacher' && t) t.revoked = true; else if (a.p_action === 'restore_teacher' && t) t.revoked = false;
+      return { ok: true };
+    }
+  });
   return {
-    async rpc(fn, args) { const d = load(); const out = fns[fn](d, args || {}); if (!/_(peek|state|my_rooms)$/.test(fn)) save(d); return out; },
+    async rpc(fn, args) { const d = load(); const out = fns[fn](d, args || {}); if (!/_(peek|state|my_rooms|me)$/.test(fn)) save(d); return out; },
+    live() { return false; },
     listen(gid, cb) { if (!bc) return null; const h = () => cb(); bc.addEventListener('message', h); return h; },
     ping() { if (bc) bc.postMessage(1); },
     unlisten(h) { if (bc && h) bc.removeEventListener('message', h); }
@@ -265,7 +290,7 @@ async function studentStart(join) {
     el('p', { class: 'muted', text: '회색 번호는 친구가 이미 골랐어요. 내 번호인데 회색이면 선생님께 「번호 풀기」를 부탁해요.' }))));
 }
 function studentBoard(join, token) {
-  let st = null, pick = null, ch = null, busy = false, online = true, pending = 0;
+  let st = null, pick = null, ch = null, busy = false, online = true, pending = 0, timer = null, stopped = false;
   const net = el('span', { class: 'net', text: '저장됨' }), lockB = el('div', { class: 'banner', hidden: true }), board = el('div', { class: 'board' });
   const ta = el('textarea', { maxlength: 80, placeholder: '예) 안 입는 옷을 바꿔 입는 날을 만들면 좋겠어. 새 옷을 덜 사게 되니까.', 'aria-label': '내 생각 카드' });
   const cnt = el('div', { class: 'cnt', text: '0 / 80자' }); ta.addEventListener('input', () => cnt.textContent = ta.value.length + ' / 80자');
@@ -282,7 +307,7 @@ function studentBoard(join, token) {
     ta.disabled = addBtn.disabled = ro; if (ro) pick = null;
     drawBoard(board, st, { role: 'student', pick, readonly: ro, onCard, onComment, onLink, onMove });
   };
-  async function refresh() { if (busy) return; busy = true; try { const s = await api.rpc('chalk_state', { p_token: token }); online = true; if (!st || s.version !== st.version || s.locked !== st.locked || s.presenting !== st.presenting) { st = s; if (!document.querySelector('dialog[open]') && !dragging()) paint(); } if (!ch) ch = api.listen(st.group_id, refresh); } catch (e) { if (String(e.message).includes('chalk_no_access')) { localStorage.removeItem(tokKey(join)); clearInterval(timer); api.unlisten(ch); say('번호가 풀렸어요. 다시 골라요.'); return studentStart(join); } online = false; } finally { busy = false; setNet(); } }
+  async function refresh() { if (busy) return; busy = true; try { const s = await api.rpc('chalk_state', { p_token: token }); online = true; if (!st || s.version !== st.version || s.locked !== st.locked || s.presenting !== st.presenting) { st = s; if (!document.querySelector('dialog[open]') && !dragging()) paint(); } if (!ch) ch = api.listen(st.group_id, refresh); } catch (e) { if (String(e.message).includes('chalk_no_access')) { localStorage.removeItem(tokKey(join)); stopped = true; clearTimeout(timer); api.unlisten(ch); say('번호가 풀렸어요. 다시 골라요.'); return studentStart(join); } online = false; } finally { busy = false; setNet(); } }
   const dragging = () => !!board.querySelector('.card[style*="grabbing"]');
   async function write(action, a) { pending++; setNet(); try { await api.rpc('chalk_write', Object.assign({ p_token: token, p_action: action }, a)); api.ping(ch); return true; } catch (e) { say(errText(e)); return false; } finally { pending--; await refresh(); if (st) paint(); } }
   async function addCard() { if (!st) return; const v = ta.value.trim(); if (!v) return say('카드에 쓸 생각을 먼저 적어요.'); const mine = st.cards.filter(c => c.mine).length, ang = (st.seat * 1.3 + mine * 0.9), rad = 30 + (mine % 3) * 6; if (await write('add_card', { p_body: v, p_x: 50 + Math.cos(ang) * rad * 1.2, p_y: 50 + Math.sin(ang) * rad })) { ta.value = ''; cnt.textContent = '0 / 80자'; } }
@@ -297,20 +322,53 @@ function studentBoard(join, token) {
   const onComment = (act, k) => write('del_comment', { p_id: k.id });
   const onLink = l => { if (confirm('내가 그은 연결선을 지울까요?')) write('del_link', { p_id: l.id }); };
   const onMove = (c, x, y) => write('move_card', { p_id: c.id, p_x: x, p_y: y });
-  const timer = setInterval(refresh, DEMO ? 2500 : 8000);
+  // 실시간 연결이 살아 있으면 45초, 끊겼으면 8초마다 다시 읽는다(기기마다 조금씩 어긋나게)
+  const wait = () => DEMO ? 2500 : Math.round((api.live(ch) ? 45000 : 8000) * (0.85 + Math.random() * 0.3));
+  const loop = async () => { await refresh(); if (!stopped) timer = setTimeout(loop, wait()); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !stopped) refresh(); });
   window.addEventListener('online', refresh); window.addEventListener('offline', () => { online = false; setNet(); });
-  refresh();
+  loop();
 }
 
 /* ───────── 교사 ───────── */
+const CODE_MSG = {
+  chalk_bad_code: '코드를 다시 확인해 주세요. 기간이 지났거나 꺼 둔 코드일 수 있습니다.',
+  chalk_code_used_up: '이 코드는 정해진 인원이 모두 사용했습니다. 코드를 안내한 분께 알려 주세요.',
+  chalk_try_later: '여러 번 틀렸습니다. 한 시간 뒤에 다시 해 주세요.',
+  chalk_revoked: '이 계정은 모둠판 만들기 권한이 꺼져 있습니다. 관리자에게 문의해 주세요.'
+};
+const signOut = () => sb.auth.signOut().then(() => { location.href = selfUrl({ t: '1' }); });
+const acctRow = (email, me) => el('p', { class: 'muted row noprint', style: 'margin-top:14px' }, DEMO ? '연습 모드' : '로그인: ' + email,
+  DEMO ? null : el('button', { onclick: signOut }, '로그아웃'),
+  me && me.admin ? el('a', { href: selfUrl({ admin: '1' }) }, '선생님 초대·관리') : null);
+async function teacherSession() { // 로그인 전이면 로그인 화면을 그리고 null 을 돌려준다
+  if (DEMO) return { email: '' };
+  const { data } = await sb.auth.getSession();
+  if (data.session) return { email: data.session.user.email || '' };
+  const back = P.has('admin') ? { admin: '1' } : Object.assign({ t: '1' }, P.get('code') ? { code: P.get('code') } : {});
+  put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판 (선생님)' }),
+    el('p', { text: '모둠마다 따로 쓰는 판을 만들고, 모든 모둠의 판을 한 화면에서 살펴봅니다.' }),
+    el('p', { class: 'muted', text: '선생님만 구글 계정으로 로그인합니다. 학생은 로그인하지 않고, 이름도 적지 않습니다. 판을 만들려면 초대 코드가 필요합니다.' }),
+    el('div', { class: 'row' }, el('button', { class: 'main', onclick: () => sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: selfUrl(back) } }) }, '구글로 로그인'),
+      el('a', { href: selfUrl({ t: '1', demo: '1' }) }, '로그인 없이 연습해 보기')))));
+  return null;
+}
 async function teacherStart() {
-  if (!DEMO) {
-    const { data } = await sb.auth.getSession();
-    if (!data.session) return put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판 (선생님)' }),
-      el('p', { text: '모둠마다 따로 쓰는 판을 만들고, 모든 모둠의 판을 한 화면에서 살펴봅니다.' }),
-      el('p', { class: 'muted', text: '선생님만 구글 계정으로 로그인합니다. 학생은 로그인하지 않고, 이름도 적지 않습니다.' }),
-      el('div', { class: 'row' }, el('button', { class: 'main', onclick: () => sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: selfUrl({ t: '1' }) } }) }, '구글로 로그인'),
-        el('a', { href: selfUrl({ t: '1', demo: '1' }) }, '로그인 없이 연습해 보기')))));
+  const ses = await teacherSession(); if (!ses) return;
+  const me = await api.rpc('chalk_me');
+  if (!me.teacher && P.get('code')) {
+    const r = await api.rpc('chalk_redeem', { p_code: P.get('code') });
+    if (r.ok) { me.teacher = true; history.replaceState(null, '', selfUrl({ t: '1' })); say('초대 코드를 확인했습니다. 이제 모둠판을 만들 수 있습니다.'); }
+    else say(CODE_MSG[r.error] || '코드를 확인하지 못했습니다.');
+  }
+  if (!me.teacher) {
+    const c = el('input', { maxlength: 12, placeholder: '예) 1A2B3C4D', style: 'max-width:240px;text-transform:uppercase', 'aria-label': '초대 코드' });
+    const go = async () => { if (!c.value.trim()) return say('초대 코드를 적어 주세요.'); try { const r = await api.rpc('chalk_redeem', { p_code: c.value }); if (r.ok) return teacherStart(); say(CODE_MSG[r.error] || '코드를 확인하지 못했습니다.'); } catch (e) { say(errText(e)); } };
+    c.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    return put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '초대 코드를 적어 주세요' }),
+      el('p', { text: '모둠판은 초대받은 선생님만 만들 수 있습니다. 연수나 안내에서 받은 코드를 한 번만 적으면 됩니다.' }),
+      el('div', { class: 'row' }, c, el('button', { class: 'main', onclick: go }, '확인')),
+      el('p', { class: 'muted', text: '학생은 코드가 필요 없습니다. 선생님이 보여 주는 모둠 QR로 들어옵니다.' }), acctRow(ses.email, me))));
   }
   const rooms = await api.rpc('chalk_my_rooms');
   const q = el('input', { maxlength: 200, placeholder: '예) 옷 쓰레기를 줄이려면, 누가 무엇을 바꿔야 할까?' }), n = el('input', { type: 'number', min: 1, max: 12, value: 6, style: 'width:110px' });
@@ -318,17 +376,66 @@ async function teacherStart() {
   put(app, el('div', { class: 'wrap' },
     el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판 만들기' }), DEMO ? el('p', { class: 'hint', text: '연습 모드입니다. 이 기기 안에서만 동작하고, 같은 브라우저의 다른 탭에서 학생 화면을 열어 볼 수 있습니다.' }) : null,
       el('label', {}, '함께 생각할 질문', q), el('div', { class: 'row', style: 'margin-top:12px' }, el('label', {}, '모둠 수 ', n), el('button', { class: 'main', onclick: make }, '모둠판 만들기')),
-      el('p', { class: 'muted', text: '질문과 모둠 수만 정하면 모둠별 QR이 만들어집니다. 판은 7일 뒤 자동으로 지워집니다.' })),
+      el('p', { class: 'muted', text: '질문과 모둠 수만 정하면 모둠별 QR이 만들어집니다. 판은 7일 뒤 자동으로 지워집니다. 수업이 끝나면 「판 지우기」를 눌러 주세요.' }), acctRow(ses.email, me)),
     rooms.length ? el('div', { class: 'panel' }, el('h2', { text: '만들어 둔 모둠판' }), rooms.map(r => el('p', {}, el('a', { href: selfUrl({ t: '1', room: r.id }) }, r.question), el('span', { class: 'muted', text: ' · ' + r.groups + '모둠 · ' + new Date(r.created_at).toLocaleDateString('ko-KR') })))) : null));
 }
+
+/* ───────── 관리자: 선생님 초대·관리 ───────── */
+async function adminStart() {
+  const ses = await teacherSession(); if (!ses) return;
+  const me = await api.rpc('chalk_me');
+  if (!me.admin) return put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '관리자만 볼 수 있습니다' }),
+    el('p', { text: '초대 코드와 선생님 목록은 관리자 계정으로 로그인해야 볼 수 있습니다.' }), el('a', { href: selfUrl({ t: '1' }) }, '모둠판 만들기로'), acctRow(ses.email, me))));
+  const body = el('div', { class: 'wrap' });
+  put(app, el('div', { class: 'top noprint' }, el('b', { text: '침묵의 대화 · 선생님 초대·관리' }), el('span', { class: 'sp' }), el('a', { href: selfUrl({ t: '1' }), style: 'color:#fff' }, '모둠판 만들기로')), body);
+  const day = s => new Date(s).toLocaleDateString('ko-KR');
+  const linkOf = code => selfUrl({ t: '1', code });
+  const act = async (action, a) => {
+    try { const r = await api.rpc('chalk_admin_action', Object.assign({ p_action: action }, a)); await draw(); return r; }
+    catch (e) { say(e.message.includes('chalk_bad_text') ? '초대 이름을 적어 주세요.' : e.message.includes('chalk_bad_groups') ? '기간은 1~365일, 인원은 1~1000명 사이로 정해 주세요.' : errText(e)); }
+  };
+  function showInvite(i) {
+    const box = el('div', { class: 'qr' });
+    const d = el('dialog', {}, el('h2', { text: '초대: ' + i.label }),
+      el('div', { class: 'qrbox' }, box, el('div', { style: 'flex:1;min-width:220px' }, el('p', { class: 'muted', text: '초대 코드' }), el('p', { style: 'font-size:34px;font-weight:800;letter-spacing:3px;margin:0 0 10px', text: i.code }),
+        el('p', { class: 'muted', text: '또는 아래 링크(QR)로 들어오면 코드를 적지 않아도 됩니다.' }), el('input', { readonly: true, value: linkOf(i.code), onclick: e => e.target.select() }),
+        el('div', { class: 'row', style: 'margin-top:10px' }, el('button', { onclick: () => navigator.clipboard.writeText(linkOf(i.code)).then(() => say('링크를 복사했습니다.')) }, '링크 복사'), el('button', { onclick: () => navigator.clipboard.writeText(i.code).then(() => say('코드를 복사했습니다.')) }, '코드 복사')))),
+      el('p', { class: 'muted', text: `${day(i.expires_at)}까지 · ${i.max_uses}명까지 · 지금 ${i.used}명 사용` }),
+      el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'main', onclick: () => { d.close(); d.remove(); } }, '닫기')));
+    document.body.append(d); d.showModal(); if (window.QRCode) new QRCode(box, { text: linkOf(i.code), width: 200, height: 200 });
+  }
+  async function draw() {
+    const st = await api.rpc('chalk_admin_state');
+    const lb = el('input', { maxlength: 60, placeholder: '예) 11월 수석교사 연수' }), dd = el('input', { type: 'number', min: 1, max: 365, value: 14, style: 'width:100px' }), mx = el('input', { type: 'number', min: 1, max: 1000, value: 50, style: 'width:100px' });
+    const make = async () => { const r = await act('create_invite', { p_label: lb.value, p_days: Number(dd.value), p_max: Number(mx.value) }); if (r && r.code) { const s2 = await api.rpc('chalk_admin_state'); const i = s2.invites.find(x => x.code === r.code); if (i) showInvite(i); } };
+    const stateOf = i => i.disabled ? '꺼 둠' : (i.expired || new Date(i.expires_at) < new Date()) ? '기간 지남' : i.used >= i.max_uses ? '인원 참' : '사용 중';
+    put(body,
+      el('div', { class: 'panel' }, el('h2', { text: '지금 상태' }),
+        el('p', { text: `열려 있는 판 ${st.now.rooms}개 · 학생 자리 ${st.now.seats}개 · 카드 ${st.now.cards}장` + (st.now.expired_rooms ? ` · 기간 지난 판 ${st.now.expired_rooms}개` : '') }),
+        st.now.expired_rooms ? el('button', { onclick: () => act('purge_expired') }, '기간 지난 판 지우기') : null,
+        el('p', { class: 'muted', text: '학생 자리는 지금 접속 중인 수가 아니라, 열려 있는 판에서 번호를 고른 기기 수입니다.' })),
+      el('div', { class: 'panel' }, el('h2', { text: '초대 코드 만들기' }), el('label', {}, '초대 이름 (선생님 목록에 표시됩니다)', lb),
+        el('div', { class: 'row', style: 'margin-top:12px' }, el('label', {}, '쓸 수 있는 기간(일) ', dd), el('label', {}, '인원 ', mx), el('button', { class: 'main', onclick: make }, '만들기')),
+        el('p', { class: 'muted', text: '코드나 링크를 받은 선생님은 구글로 로그인한 뒤 바로 모둠판을 만들 수 있습니다. 「개념 기반 수업-평가 공유」의 설계안 올리기 권한은 생기지 않습니다.' })),
+      el('div', { class: 'panel' }, el('h2', { text: '초대 코드' }), st.invites.length ? el('div', { style: 'overflow-x:auto' }, el('table', { class: 'tbl' },
+        el('tr', {}, ['초대 이름', '코드', '사용', '기한', '상태', ''].map(h => el('th', { text: h }))),
+        st.invites.map(i => el('tr', {}, el('td', { text: i.label }), el('td', { style: 'font-weight:700;letter-spacing:1px', text: i.code }), el('td', { text: i.used + ' / ' + i.max_uses }), el('td', { text: day(i.expires_at) }), el('td', { text: stateOf(i) }),
+          el('td', {}, el('div', { class: 'row' }, el('button', { onclick: () => showInvite(i) }, '코드·QR'), el('button', { onclick: () => act(i.disabled ? 'enable_invite' : 'disable_invite', { p_id: i.id }) }, i.disabled ? '다시 켜기' : '끄기'))))))) : el('p', { class: 'muted', text: '아직 만든 초대 코드가 없습니다.' })),
+      el('div', { class: 'panel' }, el('h2', { text: `초대로 들어온 선생님 ${st.teachers.length}명` }), st.teachers.length ? el('div', { style: 'overflow-x:auto' }, el('table', { class: 'tbl' },
+        el('tr', {}, ['계정', '초대', '들어온 날', '열린 판', '상태', ''].map(h => el('th', { text: h }))),
+        st.teachers.map(t => el('tr', {}, el('td', { text: t.email || '(알 수 없음)' }), el('td', { text: t.label || '-' }), el('td', { text: day(t.approved_at) }), el('td', { text: String(t.rooms) }), el('td', { text: t.revoked ? '권한 꺼짐' : '사용 중' }),
+          el('td', {}, el('button', { onclick: () => { if (t.revoked || confirm('이 선생님의 모둠판 만들기 권한을 끌까요? 이미 만든 판은 그대로 쓸 수 있고, 새 판만 만들 수 없게 됩니다.')) act(t.revoked ? 'restore_teacher' : 'revoke_teacher', { p_id: t.user_id }); } }, t.revoked ? '권한 다시 주기' : '권한 끄기')))))) : el('p', { class: 'muted', text: '아직 초대 코드로 들어온 선생님이 없습니다. 관리자는 이 목록에 나오지 않습니다.' })));
+  }
+  draw();
+}
 function teacherRoom(roomId) {
-  let st = null, open = null, chans = [], busy = false, sig = '';
+  let st = null, open = null, chans = [], busy = false, sig = '', timer = null, stopped = false;
   const head = el('div', { class: 'top noprint' }), body = el('div', { class: 'wrap' }); put(app, head, body);
   const act = async (action, a) => { try { await api.rpc('chalk_teacher_action', Object.assign({ p_room: roomId, p_action: action }, a)); chans.forEach(c => api.ping(c)); if (DEMO) api.ping(); } catch (e) { say(errText(e)); } await refresh(true); };
   async function refresh(force) {
     if (busy) return; busy = true;
     try { const s = await api.rpc('chalk_teacher_state', { p_room: roomId }); const ns = s.groups.map(g => g.version + (g.locked ? 'L' : '')).join(',') + s.present_group; if (!chans.length) chans = DEMO ? [api.listen(null, () => refresh())] : s.groups.map(g => api.listen(g.group_id, () => refresh())); st = s; if (force || ns !== sig) { sig = ns; if (!document.querySelector('dialog[open]')) paint(); } }
-    catch (e) { put(body, el('div', { class: 'panel' }, el('h1', { text: '이 모둠판을 열 수 없습니다' }), el('p', { text: '지워졌거나, 다른 계정으로 만든 판입니다.' }), el('a', { href: selfUrl({ t: '1' }) }, '처음으로'))); clearInterval(timer); }
+    catch (e) { if (String(e.message).includes('chalk_no_access')) { put(body, el('div', { class: 'panel' }, el('h1', { text: '이 모둠판을 열 수 없습니다' }), el('p', { text: '지워졌거나, 다른 계정으로 만든 판입니다.' }), el('a', { href: selfUrl({ t: '1' }) }, '처음으로'))); stopped = true; clearTimeout(timer); } else if (!st) put(body, el('div', { class: 'panel' }, el('p', { text: '연결을 다시 시도하고 있습니다…' }))); }
     finally { busy = false; }
   }
   const linkOf = g => selfUrl({ j: g.join_token });
@@ -370,7 +477,10 @@ function teacherRoom(roomId) {
           el('div', { class: 'row noprint', style: 'margin-top:8px' }, el('button', { onclick: () => showQR(g) }, 'QR·주소'), el('button', { onclick: () => act('lock_group', { p_target: g.group_id, p_on: !g.locked }) }, g.locked ? '다시 쓰기' : '잠시 멈춤'), el('button', { onclick: () => { open = g.group_id; paint(); } }, '크게 보기')));
       })));
   }
-  const timer = setInterval(() => refresh(), DEMO ? 2500 : 8000); refresh(true);
+  const wait = () => DEMO ? 2500 : Math.round((chans.length && chans.every(c => api.live(c)) ? 45000 : 8000) * (0.85 + Math.random() * 0.3));
+  const loop = async first => { await refresh(first === true); if (!stopped) timer = setTimeout(loop, wait()); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !stopped) refresh(); });
+  loop(true);
 }
 
 /* ───────── 시작 ───────── */
@@ -378,6 +488,7 @@ function teacherRoom(roomId) {
   try {
     if (!DEMO) sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { storageKey: 'chalk-talk-group-auth', detectSessionInUrl: true, flowType: 'pkce' } });
     if (P.get('j')) return studentStart(P.get('j'));
+    if (P.has('admin')) return adminStart();
     if (P.get('room')) return teacherRoom(P.get('room'));
     if (P.has('t') || DEMO) return teacherStart();
     put(app, el('div', { class: 'wrap' }, el('div', { class: 'panel' }, el('h1', { text: '침묵의 대화 · 모둠판' }),
