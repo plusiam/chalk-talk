@@ -428,7 +428,7 @@ function zipBlob(files, type) { // files: [{name, data: Uint8Array}] · 압축�
   e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
   return new Blob([...parts, ...cen, e.buffer], { type: type || 'application/zip' });
 }
-function xlsxBlob(sheets) { // sheets: [{name, widths, rows, head(머리글 줄 수), plain(테두리 없음), landscape}]
+function xlsxBlob(sheets) { // sheets: [{name, widths, rows, head(머리글 줄 수), plain(테두리 없음), landscape, style(i,j), height(i), merges, list{ref,items}}]
   const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main', RS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships', PK = 'http://schemas.openxmlformats.org/package/2006/relationships', CT = 'application/vnd.openxmlformats-officedocument.spreadsheetml.';
   const esc = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const col = n => { let s = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
@@ -436,19 +436,23 @@ function xlsxBlob(sheets) { // sheets: [{name, widths, rows, head(머리글 줄 
   const sheetXml = (sh, i) => X + `<worksheet xmlns="${NS}">` + (sh.landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '')
     + '<sheetViews><sheetView' + (i ? '' : ' tabSelected="1"') + ' workbookViewId="0">' + (sh.head ? `<pane ySplit="${sh.head}" topLeftCell="A${sh.head + 1}" activePane="bottomLeft" state="frozen"/>` : '') + '</sheetView></sheetViews>'
     + '<cols>' + sh.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols><sheetData>'
-    + sh.rows.map((r, i) => `<row r="${i + 1}">` + r.map((v, j) => {
-      const ref = col(j) + (i + 1), s = sh.plain ? 2 : i < (sh.head || 0) ? 1 : 0;
+    + sh.rows.map((r, i) => `<row r="${i + 1}"${sh.height ? ` ht="${sh.height(i)}" customHeight="1"` : ''}>` + r.map((v, j) => {
+      const ref = col(j) + (i + 1), s = sh.style ? sh.style(i, j) : sh.plain ? 2 : i < (sh.head || 0) ? 1 : 0;
       if (v === '' || v == null) return `<c r="${ref}" s="${s}"/>`;
       return typeof v === 'number' ? `<c r="${ref}" s="${s}"><v>${v}</v></c>` : `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
     }).join('') + '</row>').join('') + '</sheetData>'
+    + (sh.merges ? `<mergeCells count="${sh.merges.length}">` + sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('') + '</mergeCells>' : '')
+    + (sh.list ? `<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="${sh.list.ref}"><formula1>&quot;${esc(sh.list.items.join(','))}&quot;</formula1></dataValidation></dataValidations>` : '')
     + (sh.landscape ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '') + '</worksheet>';
-  const styles = X + `<styleSheet xmlns="${NS}"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font></fonts>`
+  const styles = X + `<styleSheet xmlns="${NS}"><fonts count="3"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="15"/><name val="맑은 고딕"/></font></fonts>`
     + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE4EFEA"/><bgColor indexed="64"/></patternFill></fill></fills>'
     + `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border></borders>`
-    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3">'
+    + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5">'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
     + '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
     + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+    + '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+    + '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
     + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
   const files = [
     ['[Content_Types].xml', X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
@@ -463,6 +467,7 @@ function xlsxBlob(sheets) { // sheets: [{name, widths, rows, head(머리글 줄 
 }
 function recordSheets(room) { // 숨긴 카드·지운 카드·숨긴 덧붙임은 넣지 않는다. 이름 없이 모둠과 자리 번호만
   const rows = [['모둠', '자리 번호', '구분', '글', '카드 번호', '덧붙인 카드 · 이은 카드']];
+  const bySeat = [['모둠', '자리 번호', '쓴 카드', '쓴 덧붙임 (어느 카드에)', '이은 카드']], blank = [];
   for (const g of room.groups) {
     const cards = g.cards.filter(c => !c.hidden && !c.deleted), no = new Map(cards.map((c, i) => [c.id, i + 1]));
     const short = c => `카드 ${no.get(c.id)} (${c.seat}번) ${c.body.length > 24 ? c.body.slice(0, 24) + '…' : c.body}`;
@@ -471,13 +476,27 @@ function recordSheets(room) { // 숨긴 카드·지운 카드·숨긴 덧붙임�
       for (const k of g.comments) if (k.card === c.id && !k.hidden) rows.push([g.group_no, k.seat, '덧붙임', k.body, no.get(c.id), short(c)]);
     }
     for (const l of g.links) { const a = cards.find(c => c.id === l.a), b = cards.find(c => c.id === l.b); if (a && b) rows.push([g.group_no, l.seat, '잇기', '', '', short(a) + '  ↔  ' + short(b)]); }
+    const cms = g.comments.filter(k => !k.hidden && no.has(k.card)), lks = g.links.filter(l => no.has(l.a) && no.has(l.b));
+    for (const s of [...new Set([...(g.seats || []), ...cards.map(c => c.seat), ...cms.map(k => k.seat), ...lks.map(l => l.seat)])].sort((a, b) => a - b)) {
+      bySeat.push([g.group_no, s, cards.filter(c => c.seat === s).map(c => `[카드 ${no.get(c.id)}] ${c.body}`).join('\n'),
+        cms.filter(k => k.seat === s).map(k => `[카드 ${no.get(k.card)} · ${cards.find(c => c.id === k.card).seat}번 글에] ${k.body}`).join('\n'),
+        lks.filter(l => l.seat === s).map(l => `카드 ${no.get(l.a)} ↔ 카드 ${no.get(l.b)}`).join('\n')]);
+      blank.push([g.group_no, s, '', '', '']);
+    }
   }
-  const d = new Date();
-  const info = [['침묵의 대화 · 모둠판 자료', ''], ['질문', room.question], ['저장한 날', `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`], ['모둠 수', room.groups.length + '개'], ['', ''],
+  const d = new Date(), day = `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
+  const form = [['침묵의 대화 기록지', '', '', '', ''], ['질문', '', room.question, '', ''], ['평가 요소', '', '', '', ''], ['저장한 날', '', day, '', ''], ['모둠', '번호', '이름', '수준', '한 줄 메모'], ...blank];
+  const info = [['침묵의 대화 · 모둠판 자료', ''], ['질문', room.question], ['저장한 날', day], ['모둠 수', room.groups.length + '개'], ['', ''],
   ['자리 번호', '학생 이름이 아닙니다. 수업 때의 자리표와 맞추어 보세요. 「번호 풀기」를 한 자리에는 두 학생의 글이 섞여 있을 수 있습니다.'],
   ['들어 있지 않은 것', '숨긴 카드, 학생이 지운 카드, 숨긴 덧붙임'],
-  ['카드 번호', '모둠 안에서 카드가 붙은 순서입니다. 덧붙임은 자기가 달린 카드의 번호를 따릅니다.']];
-  return [{ name: '글 내용', widths: [7, 10, 9, 58, 10, 50], rows, head: 1 }, { name: '안내', widths: [28, 96], rows: info, plain: true }];
+  ['카드 번호', '모둠 안에서 카드가 붙은 순서입니다. 덧붙임은 자기가 달린 카드의 번호를 따릅니다.'],
+  ['학생별 모음', '자리 번호마다 쓴 카드, 덧붙임, 이은 카드를 한 줄에 모았습니다.'],
+  ['기록지', 'A4 가로로 인쇄됩니다. 이름, 평가 요소, 수준, 한 줄 메모는 선생님이 적습니다. 이름을 적은 파일은 학교 기기에만 보관해 주세요.']];
+  return [{ name: '글 내용', widths: [7, 10, 9, 58, 10, 50], rows, head: 1 }, { name: '학생별 모음', widths: [7, 10, 62, 62, 20], rows: bySeat, head: 1, landscape: true },
+  { name: '기록지', widths: [8, 8, 16, 20, 80], rows: form, landscape: true, style: (i, j) => i === 0 ? 3 : i < 4 ? (j < 2 ? 1 : 0) : i === 4 ? 1 : j === 4 ? 0 : 4,
+    height: i => i === 0 ? 32 : i === 1 ? Math.max(24, Math.ceil(room.question.length / 55) * 18) : i < 5 ? 24 : 32,
+    merges: ['A1:E1', 'A2:B2', 'C2:E2', 'A3:B3', 'C3:E3', 'A4:B4', 'C4:E4'], list: blank.length ? { ref: 'D6:D' + (5 + blank.length), items: ['잘하고 있어요', '발전하고 있어요', '힘을 내요'] } : null },
+  { name: '안내', widths: [28, 96], rows: info, plain: true }];
 }
 
 const CODE_MSG = {
@@ -602,11 +621,11 @@ function teacherRoom(roomId) {
       const files = []; for (const g of gs) files.push({ name: g.group_no + '모둠.png', data: new Uint8Array(await (await toBlob(await boardCanvas(g))).arrayBuffer()) });
       saveBlob(zipBlob(files), `침묵의대화_${stamp}_판이미지.zip`); return `카드가 있는 ${gs.length}개 모둠 판을 그림으로 만들어 한 파일(ZIP)로 저장했습니다.`;
     };
-    const table = async () => { if (!st.groups.some(g => g.cards.some(c => !c.hidden && !c.deleted))) return '아직 카드가 붙은 모둠이 없습니다.'; saveBlob(xlsxBlob(recordSheets(st)), `침묵의대화_${stamp}.xlsx`); return '글 내용 표를 엑셀 파일로 저장했습니다.'; };
+    const table = async () => { if (!st.groups.some(g => g.cards.some(c => !c.hidden && !c.deleted))) return '아직 카드가 붙은 모둠이 없습니다.'; saveBlob(xlsxBlob(recordSheets(st)), `침묵의대화_${stamp}.xlsx`); return '글 내용 표, 학생별 모음, 기록지를 엑셀 파일 하나로 저장했습니다.'; };
     const d = el('dialog', { style: 'width:min(560px,94vw)' }, el('h2', { text: '자료 저장' }),
       el('p', { text: '판을 지우거나 7일이 지나면 학생 글이 사라집니다. 남길 자료는 그 전에 저장해 주세요.' }),
-      el('div', { class: 'row' }, el('button', { class: 'main', onclick: run(images) }, '모든 모둠 판 이미지로 저장'), el('button', { class: 'main', onclick: run(table) }, '글 내용 표로 저장 (엑셀)')), msg,
-      el('p', { class: 'muted', text: '이름 대신 모둠과 자리 번호로 저장됩니다. 숨긴 카드와 학생이 지운 카드는 들어가지 않습니다. 파일은 이 기기에서 만들어 내려받습니다.' }),
+      el('div', { class: 'row' }, el('button', { class: 'main', onclick: run(images) }, '모든 모둠 판 이미지로 저장'), el('button', { class: 'main', onclick: run(table) }, '엑셀 표로 저장')), msg,
+      el('p', { class: 'muted', text: '엑셀 파일에는 글 내용, 학생별 모음, 기록지(A4 가로)가 들어 있습니다. 이름 대신 모둠과 자리 번호로 저장되고, 숨긴 카드와 학생이 지운 카드는 들어가지 않습니다. 기록지에 이름을 적은 파일은 학교 기기에만 보관해 주세요.' }),
       el('div', { class: 'row', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { onclick: () => { d.close(); d.remove(); paint(); } }, '닫기')));
     d.addEventListener('cancel', e => { e.preventDefault(); d.close(); d.remove(); paint(); });
     document.body.append(d); d.showModal();
