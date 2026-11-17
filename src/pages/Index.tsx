@@ -53,10 +53,18 @@ const Index = () => {
               <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
                 <Users className="h-6 w-6 text-accent-foreground" />
               </div>
-              <h3 className="text-xl font-semibold">협업 모드</h3>
+              <h3 className="text-xl font-semibold">모둠 모드</h3>
               <p className="text-muted-foreground">
-                실시간 모둠 활동 지원. 팀과 함께 생각을 공유하세요. (Coming Soon)
+                모둠마다 따로 쓰는 판에서 글과 선으로 생각을 주고받아요. 학생은 선생님이 보여 준 모둠 QR로 들어옵니다.
               </p>
+              <a
+                href={`${import.meta.env.BASE_URL}group.html`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center font-semibold text-primary underline underline-offset-4"
+              >
+                모둠판 열기 →
+              </a>
             </div>
           </div>
         </div>
